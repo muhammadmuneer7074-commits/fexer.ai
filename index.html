@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,705 +9,506 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
+
 <body>
 
-  <div class="app-container">
+  <div class="app-root">
 
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <!-- ── NAV ── -->
+    <nav class="app-nav">
+      <span class="nav-logo">Fexer AI</span>
+      <div class="nav-tabs">
+        <button class="nav-tab active" data-view="chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          Chat
+        </button>
+        <button class="nav-tab" data-view="agents">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+          </svg>
+          Agents
+        </button>
+      </div>
+    </nav>
 
-    <div class="sidebar" id="sidebar">
+    <!-- ══════════════════════════════════════════
+       VIEW 1: CHAT
+  ══════════════════════════════════════════ -->
+    <div class="view active" id="view-chat">
+      <div class="app-container">
 
-      <div class="sidebar-header-row">
-        <span class="sidebar-app-name">Fexer AI</span>
-        <div class="sidebar-header-actions">
-          <div class="sidebar-search-wrapper">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="chatSearchInput" placeholder="Search chats...">
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="sidebar" id="sidebar">
+          <div class="sidebar-header-row">
+            <span class="sidebar-app-name">Fexer AI</span>
+            <div class="sidebar-header-actions">
+              <div class="sidebar-search-wrapper">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input type="text" id="chatSearchInput" placeholder="Search chats...">
+              </div>
+              <button id="sidebarCloseBtn" class="sidebar-close-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
           </div>
-          <button id="sidebarCloseBtn" class="sidebar-close-btn" title="Close sidebar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
+          <button id="sidebarNewChatBtn" class="sidebar-new-chat-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
+            <span>New Chat</span>
           </button>
+          <div class="sidebar-scroll-area">
+            <div class="sidebar-section-label">Recents</div>
+            <div class="chat-list" id="chatList"></div>
+          </div>
+        </div>
+
+        <div class="main-chat">
+          <div class="chat-header">
+            <button id="menuToggle" class="menu-toggle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <h1>Fexer AI</h1>
+            <div class="header-right">
+              <button id="ghostChatBtn" class="ghost-btn" title="Temporary chat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 10h.01M15 10h.01M5 11a7 7 0 0 1 14 0v6.5l-2.5-1.5-2 1.5-2-1.5-2 1.5-2-1.5L5 17.5z" />
+                </svg>
+              </button>
+              <div class="chat-options-wrapper" id="chatOptionsWrapper">
+                <div class="chat-options-bubble">
+                  <button id="chatOptionsMenuBtn" class="bubble-icon-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="12" cy="5" r="1.8" />
+                      <circle cx="12" cy="12" r="1.8" />
+                      <circle cx="12" cy="19" r="1.8" />
+                    </svg>
+                  </button>
+                  <button id="bubbleNewChatBtn" class="bubble-icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="action-dropdown" id="chatOptionsDropdown">
+                  <button id="optStarBtn" class="dropdown-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon
+                        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                    <span id="starBtnLabel">Star</span>
+                  </button>
+                  <button id="optRenameBtn" class="dropdown-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Rename
+                  </button>
+                  <button id="optDeleteBtn" class="dropdown-item dropdown-item-danger">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-messages" id="chatMessages"></div>
+
+          <div class="chat-input-wrapper">
+            <div class="attach-menu" id="attachMenu">
+              <button id="choosePhotoBtn" class="dropdown-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                Photos
+              </button>
+              <button id="takePhotoBtn" class="dropdown-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                Camera
+              </button>
+              <button id="chooseFileBtn" class="dropdown-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                Files
+              </button>
+              <div class="attach-divider"></div>
+              <div class="attach-toggle-row">
+                <span>AI Tools</span>
+                <button id="toolsToggleMenu" class="toggle-switch small-toggle" role="switch"
+                  aria-checked="true"></button>
+              </div>
+              <div class="attach-toggle-row">
+                <span>Web Search</span>
+                <button id="webSearchToggleMenu" class="toggle-switch small-toggle" role="switch"
+                  aria-checked="false"></button>
+              </div>
+            </div>
+
+            <div class="image-preview-area" id="imagePreviewArea"></div>
+
+            <div class="chat-input-area">
+              <button id="attachBtn" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+              <input type="text" id="userInput" placeholder="Message Fexer AI..." />
+              <button id="micBtn" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              </button>
+              <button id="actionBtn" class="action-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="3" y1="10" x2="3" y2="14" />
+                  <line x1="7" y1="6" x2="7" y2="18" />
+                  <line x1="11" y1="3" x2="11" y2="21" />
+                  <line x1="15" y1="6" x2="15" y2="18" />
+                  <line x1="19" y1="10" x2="19" y2="14" />
+                </svg>
+              </button>
+            </div>
+
+            <input type="file" id="imageInput" accept="image/*,video/*" hidden>
+            <input type="file" id="fileUploadInput" accept=".txt,.md,.csv,.json,.js,.py,.html,.css" hidden>
+          </div>
+
+          <!-- Voice Overlay -->
+          <div class="voice-overlay" id="voiceOverlay">
+            <button id="closeVoiceOverlayBtn" class="voice-close-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <div class="bg-cloud cloud-a"></div>
+            <div class="bg-cloud cloud-b"></div>
+            <div class="bg-cloud cloud-c"></div>
+            <div class="voice-orb" id="voiceOrb">
+              <div class="color-blob"></div>
+            </div>
+            <p class="voice-status-text" id="voiceStatusText">Listening...</p>
+          </div>
+
+          <!-- Camera Overlay -->
+          <div class="camera-overlay" id="cameraOverlay">
+            <video id="cameraVideo" autoplay playsinline muted></video>
+            <canvas id="cameraCanvas" hidden></canvas>
+            <div class="camera-controls">
+              <button id="cameraCancelBtn" class="camera-side-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+              <button id="cameraCaptureBtn" class="camera-capture-btn"></button>
+              <button id="cameraSwitchBtn" class="camera-side-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 4v6h-6" />
+                  <path d="M1 20v-6h6" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+                  <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
-
-      <button id="sidebarNewChatBtn" class="sidebar-full-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        <span>New Chat</span>
-      </button>
-
-      <div class="sidebar-scroll-area">
-
-        <div class="sidebar-section-header">
-          <span class="sidebar-recents-label">Recents</span>
-        </div>
-        <div class="chat-list" id="chatList"></div>
-
-        <div class="sidebar-divider"></div>
-
-        <div class="sidebar-section-header">
-          <span class="sidebar-recents-label">Projects</span>
-          <button id="addProjectBtn" class="small-icon-btn" title="New project">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-        </div>
-        <div class="project-list" id="projectList"></div>
-
-        <div class="sidebar-divider"></div>
-
-        <div class="sidebar-section-header">
-          <span class="sidebar-recents-label">Automations</span>
-          <button id="addAutomationBtn" class="small-icon-btn" title="Add automation">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-        </div>
-        <div class="automation-list" id="automationList"></div>
-
-      </div>
-
-      <button id="sidebarProfileBtn" class="sidebar-full-btn sidebar-profile-btn">
-        <span class="profile-avatar-mini" id="sidebarProfileAvatarContent">U</span>
-        <span>Profile</span>
-      </button>
-
     </div>
 
-    <div class="main-chat">
+    <!-- ══════════════════════════════════════════
+       VIEW 2: AGENTS
+  ══════════════════════════════════════════ -->
+    <div class="view" id="view-agents">
+      <div class="agents-layout">
 
-      <div class="chat-header">
-        <button id="menuToggle" class="menu-toggle" title="Toggle menu">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"/>
-            <line x1="3" y1="12" x2="21" y2="12"/>
-            <line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
-        </button>
-        <h1>Fexer AI</h1>
-        <div class="header-right">
-
-          <button id="ghostChatBtn" class="ghost-btn" title="Start temporary chat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 10h.01M15 10h.01M5 11a7 7 0 0 1 14 0v6.5l-2.5-1.5-2 1.5-2-1.5-2 1.5-2-1.5L5 17.5z"/>
-            </svg>
-          </button>
-
-          <div class="chat-options-wrapper" id="chatOptionsWrapper">
-            <div class="chat-options-bubble">
-              <button id="chatOptionsMenuBtn" class="bubble-icon-btn" title="Chat options">
-                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
-              </button>
-              <button id="bubbleNewChatBtn" class="bubble-icon-btn" title="New chat">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </button>
-            </div>
-
-            <div class="action-dropdown" id="chatOptionsDropdown">
-              <button id="optAddToProjectBtn" class="attach-menu-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                Add to Project
-              </button>
-              <button id="optStarBtn" class="attach-menu-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                <span id="starBtnLabel">Star</span>
-              </button>
-              <button id="optRenameBtn" class="attach-menu-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                Rename
-              </button>
-              <button id="optShareBtn" class="attach-menu-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                Share
-              </button>
-              <button id="optDeleteBtn" class="attach-menu-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-                Delete
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <div class="chat-messages" id="chatMessages">
-        <div class="message bot-message">
-          Hi! I'm Fexer AI. Ask me anything.
-        </div>
-      </div>
-
-      <div class="chat-input-wrapper" id="chatInputWrapper">
-
-        <div class="attach-menu" id="attachMenu">
-          <button id="choosePhotoBtn" class="attach-menu-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-            Photos
-          </button>
-          <button id="takePhotoBtn" class="attach-menu-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            Camera
-          </button>
-          <button id="chooseFileBtn" class="attach-menu-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            Files
-          </button>
-          <button id="attachToProjectBtn" class="attach-menu-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            </svg>
-            Add to Project
-          </button>
-          <div class="attach-menu-divider"></div>
-          <div class="attach-menu-toggle-row">
-            <span>Tools</span>
-            <button id="toolsToggleMenu" class="toggle-switch small-toggle" role="switch" aria-checked="true"></button>
-          </div>
-          <div class="attach-menu-toggle-row">
-            <span>Web Search</span>
-            <button id="webSearchToggleMenu" class="toggle-switch small-toggle" role="switch" aria-checked="false"></button>
-          </div>
-        </div>
-
-        <div class="image-preview-area" id="imagePreviewArea"></div>
-
-        <div class="chat-input-area">
-
-          <button id="attachBtn" class="icon-btn" title="Add attachment">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </button>
-
-          <input type="text" id="userInput" placeholder="Type your message..." />
-
-          <button id="micBtn" class="icon-btn" title="Voice to text">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-          </button>
-
-          <button id="actionBtn" class="action-btn" title="Start live voice chat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="3" y1="10" x2="3" y2="14"/>
-              <line x1="7" y1="6" x2="7" y2="18"/>
-              <line x1="11" y1="3" x2="11" y2="21"/>
-              <line x1="15" y1="6" x2="15" y2="18"/>
-              <line x1="19" y1="10" x2="19" y2="14"/>
-            </svg>
-          </button>
-
-        </div>
-
-        <input type="file" id="imageInput" accept="image/*,video/*" hidden>
-        <input type="file" id="fileUploadInput" accept=".txt,.md,.csv,.json,.js,.py,.html,.css,text/plain" hidden>
-
-      </div>
-
-      <div class="voice-overlay" id="voiceOverlay">
-        <button id="closeVoiceOverlayBtn" class="voice-overlay-close" title="End live voice chat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-        <div class="bg-cloud cloud-a"></div>
-        <div class="bg-cloud cloud-b"></div>
-        <div class="bg-cloud cloud-c"></div>
-        <div class="voice-orb" id="voiceOrb">
-          <div class="color-blob"></div>
-        </div>
-        <p class="voice-status-text" id="voiceStatusText">Listening...</p>
-      </div>
-
-      <div class="camera-overlay" id="cameraOverlay">
-        <video id="cameraVideo" autoplay playsinline muted></video>
-        <canvas id="cameraCanvas" hidden></canvas>
-        <div class="camera-controls">
-          <button id="cameraCancelBtn" class="camera-side-btn" title="Cancel">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-          <button id="cameraCaptureBtn" class="camera-capture-btn" title="Take photo"></button>
-          <button id="cameraSwitchBtn" class="camera-side-btn" title="Switch camera">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M23 4v6h-6"/>
-              <path d="M1 20v-6h6"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
-              <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- ===== SETTINGS — mobile-style page stack ===== -->
-      <div class="settings-overlay" id="profileOverlay">
-        <div class="mobile-settings-modal">
-          <div class="settings-pages" id="settingsPages">
-
-            <!-- MAIN LIST -->
-            <div class="settings-page active" data-page="main">
-              <div class="settings-page-header">
-                <button class="settings-page-close" id="closeProfileBtn" title="Close">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-                <h2>Settings</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <div class="settings-row" data-nav="profile">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></span>
-                  <span class="settings-row-label">Profile</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-                <div class="settings-row" data-nav="billing">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="6" x2="12" y2="18"/><path d="M15 9.5a3 3 0 0 0-3-1.5h-1a2.5 2.5 0 0 0 0 5h2a2.5 2.5 0 0 1 0 5h-1a3 3 0 0 1-3-1.5"/></svg></span>
-                  <span class="settings-row-label">Billing</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-
-                <div class="settings-row-divider"></div>
-
-                <div class="settings-row" data-nav="capabilities">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
-                  <span class="settings-row-label">Capabilities</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-                <div class="settings-row" data-nav="connectors">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/></svg></span>
-                  <span class="settings-row-label">Connectors</span>
-                  <span class="settings-row-value" id="connectorsCountValue">0</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-                <div class="settings-row" data-nav="permissions">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="9" height="5" rx="2.5"/><rect x="13" y="13" width="9" height="5" rx="2.5"/></svg></span>
-                  <span class="settings-row-label">Permissions</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-
-                <div class="settings-row-divider"></div>
-
-                <div class="settings-row" data-nav="appearance">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
-                  <span class="settings-row-label">Appearance</span>
-                  <span class="settings-row-value" id="appearanceValue">Dark</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-                <div class="settings-row" data-nav="voice">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
-                  <span class="settings-row-label">Voice</span>
-                  <span class="settings-row-value" id="voiceCurrentValue">Auto</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-                <div class="settings-row" data-nav="notifications">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
-                  <span class="settings-row-label">Notifications</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-                <div class="settings-row" data-nav="privacy">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-8 10-8 10S4 17 4 12V6z"/></svg></span>
-                  <span class="settings-row-label">Privacy</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-                <div class="settings-row" data-nav="sharedlinks">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
-                  <span class="settings-row-label">Shared links</span>
-                  <span class="settings-row-value" id="sharedLinksCountValue">0</span>
-                  <svg class="settings-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-
-                <div class="settings-row-divider"></div>
-
-                <div class="settings-row settings-row-danger" id="logoutBtnMain">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
-                  <span class="settings-row-label">Log out</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- PROFILE -->
-            <div class="settings-page" data-page="profile">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Profile</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <div class="settings-section profile-photo-section">
-                  <div class="profile-photo-preview" id="profilePhotoPreview">U</div>
-                  <button id="choosePhotoForProfileBtn" class="settings-mini-btn">Change Photo</button>
-                  <input type="file" id="profilePhotoInput" accept="image/*" hidden>
-                </div>
-
-                <div class="settings-section">
-                  <label class="settings-label">Full name</label>
-                  <input type="text" id="profileNameInput" class="settings-input" placeholder="Your name">
-                </div>
-
-                <div class="settings-section">
-                  <label class="settings-label">Instructions for Fexer AI</label>
-                  <p class="settings-hint">Fexer AI will keep these in mind across every chat.</p>
-                  <textarea id="customInstructionsInput" class="settings-textarea" placeholder="e.g. Always reply in Roman Urdu"></textarea>
-                </div>
-
-                <button id="saveProfileBtn" class="settings-save-btn">Save Profile</button>
-
-                <div class="settings-tab-divider"></div>
-
-                <div class="settings-section">
-                  <label class="settings-label">Response Style</label>
-                  <div class="style-options" id="styleOptions">
-                    <button class="style-chip" data-style="normal">Normal</button>
-                    <button class="style-chip" data-style="concise">Concise</button>
-                    <button class="style-chip" data-style="friendly">Friendly</button>
-                    <button class="style-chip" data-style="formal">Formal</button>
-                    <button class="style-chip" data-style="creative">Creative</button>
-                  </div>
-                </div>
-
-                <div class="settings-tab-divider"></div>
-
-                <button id="deleteAccountBtn" class="settings-row settings-row-danger" style="margin:0;">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></span>
-                  <span class="settings-row-label">Delete account</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- BILLING -->
-            <div class="settings-page" data-page="billing">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Billing</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <div class="billing-plan-card">
-                  <div class="billing-plan-header">
-                    <div>
-                      <h3 class="settings-tab-title" style="margin-bottom:2px;">Free plan</h3>
-                      <p class="settings-hint">Try Fexer AI</p>
-                    </div>
-                    <button id="upgradePlanBtn" class="settings-mini-btn">Upgrade</button>
-                  </div>
-                  <ul class="billing-feature-list">
-                    <li>Chat on web and desktop</li>
-                    <li>Generate code and visualize data</li>
-                    <li>Write, edit, and create content</li>
-                    <li>Analyze text and images</li>
-                    <li>Ability to search the web</li>
-                    <li>Create files and execute code</li>
-                    <li>Connect your own automations</li>
-                  </ul>
-                </div>
-                <p class="settings-hint" style="margin-top:14px;">Real billing/upgrades require Stripe setup. Not connected yet.</p>
-              </div>
-            </div>
-
-            <!-- CAPABILITIES -->
-            <div class="settings-page" data-page="capabilities">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Capabilities</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <div class="settings-section settings-toggle-row">
-                  <div>
-                    <label class="settings-label">Deep Thinking</label>
-                    <p class="settings-hint">AI reasons more carefully, step by step, before answering.</p>
-                  </div>
-                  <button id="deepThinkingToggle" class="toggle-switch" role="switch" aria-checked="false"></button>
-                </div>
-                <div class="settings-section settings-toggle-row">
-                  <div>
-                    <label class="settings-label">AI Tools</label>
-                    <p class="settings-hint">Lets Fexer AI generate images when you ask for one.</p>
-                  </div>
-                  <button id="toolsEnabledToggle" class="toggle-switch" role="switch" aria-checked="true"></button>
-                </div>
-                <div class="settings-section settings-toggle-row">
-                  <div>
-                    <label class="settings-label">Web Search</label>
-                    <p class="settings-hint">Searches the web for current info before answering.</p>
-                  </div>
-                  <button id="deepSearchToggle" class="toggle-switch" role="switch" aria-checked="false"></button>
-                </div>
-              </div>
-            </div>
-
-            <!-- CONNECTORS -->
-            <div class="settings-page" data-page="connectors">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Connectors</h2>
-                <button id="addConnectorBtn" class="settings-page-back" style="margin-left:auto;" title="Add connector">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                </button>
-              </div>
-              <div class="settings-page-body">
-                <p class="settings-hint">Connectors trigger your own n8n workflows — Slack, Telegram, Gmail, Sheets, Notion, WhatsApp, and more.</p>
-                <div class="automation-list" id="connectorsListInSettings"></div>
-              </div>
-            </div>
-
-            <!-- PERMISSIONS -->
-            <div class="settings-page" data-page="permissions">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Permissions</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <div class="settings-row settings-row-permission" id="micPermissionRow">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span>
-                  <div style="flex:1;">
-                    <span class="settings-row-label">Microphone</span>
-                    <p class="settings-hint">Used for live voice chat and dictation.</p>
-                  </div>
-                  <span class="settings-row-value" id="micPermissionStatus">Checking…</span>
-                </div>
-                <div class="settings-row settings-row-permission" id="camPermissionRow">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
-                  <div style="flex:1;">
-                    <span class="settings-row-label">Camera</span>
-                    <p class="settings-hint">Used when you take a photo from the attach menu.</p>
-                  </div>
-                  <span class="settings-row-value" id="camPermissionStatus">Checking…</span>
-                </div>
-                <div class="settings-row settings-row-permission" id="notifPermissionRow">
-                  <span class="settings-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
-                  <div style="flex:1;">
-                    <span class="settings-row-label">Notifications</span>
-                    <p class="settings-hint">Used to alert you when a reply finishes in the background.</p>
-                  </div>
-                  <span class="settings-row-value" id="notifPermissionStatus">Checking…</span>
-                </div>
-                <p class="settings-hint" style="margin-top:12px;">Tap a row to (re)request that permission from your browser.</p>
-              </div>
-            </div>
-
-            <!-- APPEARANCE -->
-            <div class="settings-page" data-page="appearance">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Appearance</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <div class="style-options" id="appearanceOptions">
-                  <button class="style-chip" data-theme="light">Light</button>
-                  <button class="style-chip" data-theme="dark">Dark</button>
-                  <button class="style-chip" data-theme="system">System</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- VOICE -->
-            <div class="settings-page" data-page="voice">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Voice</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <p class="settings-hint">Voice used for live voice chat and read-aloud replies.</p>
-                <div class="style-options" id="voiceOptions">
-                  <button class="style-chip voice-chip" data-voice="auto">Auto</button>
-                  <button class="style-chip voice-chip" data-voice="alloy">Alloy</button>
-                  <button class="style-chip voice-chip" data-voice="echo">Echo</button>
-                  <button class="style-chip voice-chip" data-voice="fable">Fable</button>
-                  <button class="style-chip voice-chip" data-voice="onyx">Onyx</button>
-                  <button class="style-chip voice-chip" data-voice="nova">Nova</button>
-                  <button class="style-chip voice-chip" data-voice="shimmer">Shimmer</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- NOTIFICATIONS -->
-            <div class="settings-page" data-page="notifications">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Notifications</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <div class="settings-section settings-toggle-row">
-                  <div>
-                    <label class="settings-label">Response completions</label>
-                    <p class="settings-hint">Get a browser notification when a reply finishes while this tab is in the background.</p>
-                  </div>
-                  <button id="notifyOnCompleteToggle" class="toggle-switch" role="switch" aria-checked="false"></button>
-                </div>
-                <div class="settings-section settings-toggle-row">
-                  <div>
-                    <label class="settings-label">Read Replies Aloud</label>
-                    <p class="settings-hint">Automatically speak every reply out loud.</p>
-                  </div>
-                  <button id="autoSpeakToggle" class="toggle-switch" role="switch" aria-checked="false"></button>
-                </div>
-              </div>
-            </div>
-
-            <!-- PRIVACY -->
-            <div class="settings-page" data-page="privacy">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Privacy</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body">
-                <p class="settings-hint">Fexer AI stores your chats, projects, and settings only in this browser's local storage.</p>
-
-                <div class="settings-tab-divider"></div>
-
-                <div class="settings-section settings-row-action">
-                  <div>
-                    <label class="settings-label">Export data</label>
-                    <p class="settings-hint">Download all your chats, projects, and settings.</p>
-                  </div>
-                  <button id="exportDataBtn" class="settings-mini-btn">Export</button>
-                </div>
-
-                <div class="settings-section settings-row-action">
-                  <div>
-                    <label class="settings-label">Clear all chats</label>
-                    <p class="settings-hint">Deletes every conversation from this device.</p>
-                  </div>
-                  <button id="clearAllChatsBtn" class="settings-mini-btn settings-mini-btn-danger">Clear</button>
-                </div>
-
-                <div class="settings-section settings-row-action">
-                  <div>
-                    <label class="settings-label">Clear all automations</label>
-                    <p class="settings-hint">Deletes every saved automation from this device.</p>
-                  </div>
-                  <button id="clearAllAutomationsBtn" class="settings-mini-btn settings-mini-btn-danger">Clear</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- SHARED LINKS -->
-            <div class="settings-page" data-page="sharedlinks">
-              <div class="settings-page-header">
-                <button class="settings-page-back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                <h2>Shared links</h2>
-                <span class="settings-page-spacer"></span>
-              </div>
-              <div class="settings-page-body" id="sharedLinksBody">
-                <div class="settings-empty-state" id="sharedLinksEmptyState">
-                  <div class="settings-empty-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                  </div>
-                  <p class="settings-empty-title">No shared links</p>
-                  <p class="settings-hint">Use Share in a chat's options menu to create one.</p>
-                </div>
-                <div class="automation-list" id="sharedLinksList"></div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-
-      <!-- Add/Edit Automation -->
-      <div class="settings-overlay" id="automationOverlay">
-        <div class="settings-panel">
-          <div class="settings-panel-header">
-            <h2 id="automationModalTitle">Add Automation</h2>
-            <button id="closeAutomationBtn" class="settings-close-btn" title="Close">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
+        <!-- LEFT: Agent List -->
+        <div class="agents-sidebar">
+          <div class="agents-sidebar-header">
+            <h2>My Agents</h2>
+            <button id="newAgentBtn" class="agents-new-btn" title="New Agent">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </button>
           </div>
-
-          <div class="settings-section">
-            <label class="settings-label">Name</label>
-            <input type="text" id="automationNameInput" class="settings-input" placeholder="e.g. Send Weekly Report">
+          <div class="agents-list" id="agentsList">
+            <div class="agents-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+              <p>No agents yet</p>
+              <span>Create your first AI agent</span>
+            </div>
           </div>
+        </div>
 
-          <div class="settings-section">
-            <label class="settings-label">Trigger Command (optional)</label>
-            <p class="settings-hint">Type this in chat to run it automatically, e.g. /report</p>
-            <input type="text" id="automationCommandInput" class="settings-input" placeholder="/report">
-          </div>
+        <!-- RIGHT: Agent Builder -->
+        <div class="agents-main" id="agentsMain">
 
-          <div class="settings-section">
-            <label class="settings-label">App</label>
-            <p class="settings-hint">Kahan bhejna hai? (Master Automation Workflow ka router yahi check karta hai)</p>
-            <div class="style-options" id="automationAppOptions">
-              <button class="style-chip app-chip" data-app="slack">Slack</button>
-              <button class="style-chip app-chip" data-app="telegram">Telegram</button>
-              <button class="style-chip app-chip" data-app="gmail">Gmail</button>
-              <button class="style-chip app-chip" data-app="sheets">Sheets</button>
-              <button class="style-chip app-chip" data-app="notion">Notion</button>
-              <button class="style-chip app-chip" data-app="whatsapp">WhatsApp</button>
+          <!-- STATE 0: Welcome -->
+          <div class="agent-state active" id="state-welcome">
+            <div class="welcome-hero">
+              <div class="welcome-orb">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              </div>
+              <h1>Build AI Agents</h1>
+              <p>Describe what you want to automate. Fexer will detect the services, ask for credentials, generate the
+                workflow, and deploy it — automatically.</p>
+              <div class="welcome-examples">
+                <p class="examples-label">Try these:</p>
+                <button class="example-chip"
+                  data-prompt="Monitor my Gmail for invoices, extract the data, save to Google Sheets, and notify me on Slack">📧
+                  Gmail → Sheets → Slack</button>
+                <button class="example-chip"
+                  data-prompt="Create an AI agent that monitors a Telegram channel, summarizes messages with OpenAI, and posts the summary to Notion every day">📱
+                  Telegram → AI Summary → Notion</button>
+                <button class="example-chip"
+                  data-prompt="Scrape product prices from a website every hour, compare with previous prices, and alert me on Slack if price drops by 10%">🛒
+                  Price Monitor → Slack Alert</button>
+                <button class="example-chip"
+                  data-prompt="When someone fills my Typeform, use AI to categorize their request, create a ticket in Notion, and send a personalized email reply via Gmail">📝
+                  Typeform → AI → Notion + Gmail</button>
+              </div>
+            </div>
+            <div class="agent-prompt-bar">
+              <textarea id="agentPromptInput"
+                placeholder="Describe your automation... e.g. 'Monitor Gmail for invoices and save to Google Sheets'"
+                rows="3"></textarea>
+              <button id="agentSubmitBtn" class="agent-submit-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                Build Agent
+              </button>
             </div>
           </div>
 
-          <div class="settings-section">
-            <label class="settings-label">Target</label>
-            <p class="settings-hint">Channel ID, Chat ID, email — jo bhi us app ko chahiye</p>
-            <input type="text" id="automationTargetInput" class="settings-input" placeholder="e.g. C0BDU1YM8N8 ya 7084672993">
+          <!-- STATE 1: Planning -->
+          <div class="agent-state" id="state-planning">
+            <div class="state-header">
+              <div class="state-icon planning-pulse">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <div>
+                <h2>Analyzing your request...</h2>
+                <p>AI is detecting services, credentials, and creating a plan</p>
+              </div>
+            </div>
+            <div class="planning-steps" id="planningSteps">
+              <div class="plan-step active">
+                <div class="step-dot"></div>
+                <span>Understanding your goal</span>
+              </div>
+              <div class="plan-step">
+                <div class="step-dot"></div>
+                <span>Detecting required services</span>
+              </div>
+              <div class="plan-step">
+                <div class="step-dot"></div>
+                <span>Identifying credentials needed</span>
+              </div>
+              <div class="plan-step">
+                <div class="step-dot"></div>
+                <span>Generating execution plan</span>
+              </div>
+            </div>
           </div>
 
-          <div class="settings-section">
-            <label class="settings-label">n8n Webhook URL</label>
-            <input type="text" id="automationUrlInput" class="settings-input" placeholder="https://your-n8n-instance.com/webhook/...">
+          <!-- STATE 2: Plan Review + Credentials -->
+          <div class="agent-state" id="state-credentials">
+            <div class="state-header">
+              <div class="state-icon success-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <div>
+                <h2 id="planAgentName">Agent Name</h2>
+                <p id="planDescription">Description</p>
+              </div>
+            </div>
+
+            <div class="plan-grid">
+              <div class="plan-card">
+                <h3>📋 Execution Plan</h3>
+                <ol id="planSteps" class="plan-steps-list"></ol>
+              </div>
+              <div class="plan-card">
+                <h3>⚡ n8n Nodes</h3>
+                <div id="planNodes" class="plan-tags"></div>
+              </div>
+            </div>
+
+            <div class="credentials-section" id="credentialsSection">
+              <h3>🔑 Required Credentials</h3>
+              <p class="cred-hint">Fexer needs these to build and deploy your agent:</p>
+              <div id="credentialsList" class="credentials-list"></div>
+            </div>
+
+            <div class="cred-actions">
+              <button id="backToWelcomeBtn" class="btn-secondary">← Back</button>
+              <button id="deployAgentBtn" class="btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                Deploy Agent
+              </button>
+            </div>
           </div>
 
-          <button id="saveAutomationBtn" class="settings-save-btn">Save Automation</button>
-          <button id="deleteAutomationBtn" class="settings-save-btn clear-all-btn" style="margin-top:10px; display:none;">Delete Automation</button>
+          <!-- STATE 3: Deploying -->
+          <div class="agent-state" id="state-deploying">
+            <div class="state-header">
+              <div class="state-icon deploying-spin">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="2" x2="12" y2="6" />
+                  <line x1="12" y1="18" x2="12" y2="22" />
+                  <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" />
+                  <line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
+                  <line x1="2" y1="12" x2="6" y2="12" />
+                  <line x1="18" y1="12" x2="22" y2="12" />
+                  <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" />
+                  <line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
+                </svg>
+              </div>
+              <div>
+                <h2>Deploying your agent...</h2>
+                <p>Generating workflow, creating credentials, and deploying to n8n</p>
+              </div>
+            </div>
+            <div class="deploy-steps" id="deploySteps">
+              <div class="deploy-step" id="dstep-1">
+                <div class="dstep-icon pending">⏳</div>
+                <span>Creating n8n credentials</span>
+              </div>
+              <div class="deploy-step" id="dstep-2">
+                <div class="dstep-icon pending">⏳</div>
+                <span>Generating workflow with AI</span>
+              </div>
+              <div class="deploy-step" id="dstep-3">
+                <div class="dstep-icon pending">⏳</div>
+                <span>Deploying to n8n</span>
+              </div>
+              <div class="deploy-step" id="dstep-4">
+                <div class="dstep-icon pending">⏳</div>
+                <span>Activating workflow</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STATE 4: Running Dashboard -->
+          <div class="agent-state" id="state-running">
+            <div class="agent-dashboard">
+              <div class="dashboard-header">
+                <div>
+                  <h2 id="dashAgentName">Agent Name</h2>
+                  <p id="dashAgentDesc">Description</p>
+                </div>
+                <div class="status-badge active-badge" id="dashStatus">🟢 Active</div>
+              </div>
+
+              <div class="dashboard-stats">
+                <div class="stat-card">
+                  <span class="stat-num" id="statTotal">0</span>
+                  <span class="stat-label">Total Runs</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-num success" id="statSuccess">0</span>
+                  <span class="stat-label">Successful</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-num danger" id="statFailed">0</span>
+                  <span class="stat-label">Failed</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-num" id="statLast">—</span>
+                  <span class="stat-label">Last Run</span>
+                </div>
+              </div>
+
+              <div class="dashboard-actions">
+                <a id="dashN8nLink" href="#" target="_blank" class="btn-secondary">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  Open in n8n
+                </a>
+                <button id="dashRefreshBtn" class="btn-secondary">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                  Refresh
+                </button>
+                <button id="dashDeleteBtn" class="btn-danger">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  </svg>
+                  Delete Agent
+                </button>
+              </div>
+
+              <div class="executions-log">
+                <h3>Recent Executions</h3>
+                <div id="executionsList" class="exec-list">
+                  <p class="exec-empty">No executions yet. The agent will run based on its trigger.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
-
-      <!-- Add chat to project -->
-      <div class="settings-overlay" id="projectPickerOverlay">
-        <div class="settings-panel">
-          <div class="settings-panel-header">
-            <h2>Add to Project</h2>
-            <button id="closeProjectPickerBtn" class="settings-close-btn" title="Close">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-
-          <div class="settings-section">
-            <div class="style-options" id="projectPickerList"></div>
-          </div>
-
-          <div class="settings-section">
-            <label class="settings-label">New Project</label>
-            <input type="text" id="newProjectNameInput" class="settings-input" placeholder="Project name">
-          </div>
-
-          <button id="createProjectFromPickerBtn" class="settings-save-btn">Create &amp; Assign</button>
-        </div>
-      </div>
-
     </div>
 
   </div>
 
   <script src="script.js"></script>
 </body>
+
 </html>
