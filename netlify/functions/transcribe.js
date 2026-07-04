@@ -1,47 +1,68 @@
-exports.handler = async function (event) {
+// Transcribes audio to text using OpenAI Whisper.
+// Expects a JSON body with base64-encoded audio: { audio: "base64...", mimeType: "audio/webm" }
+const { getUserFromRequest } = require("./_supabaseAdmin");
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: "Method not allowed" })
-    };
+    return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
+  }
+
+  const { user, error: authError } = await getUserFromRequest(event);
+  if (authError) {
+    return { statusCode: 401, body: JSON.stringify({ error: authError }) };
   }
 
   try {
-    const { audioBase64, mimeType } = JSON.parse(event.body);
-    const apiKey = process.env.OPENAI_API_KEY;
+    const { audio, mimeType } = JSON.parse(event.body);
 
-    const audioBuffer = Buffer.from(audioBase64, "base64");
+    if (!audio) {
+      return { statusCode: 400, body: JSON.stringify({ error: "audio (base64) is required" }) };
+    }
 
-    const formData = new FormData();
-    formData.append("file", new Blob([audioBuffer], { type: mimeType }), "audio.webm");
-    formData.append("model", "whisper-1");
+    const audioBuffer = Buffer.from(audio, "base64");
+    const ext = (mimeType || "audio/webm").split("/")[1] || "webm";
 
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    const boundary = "----FexerBoundary" + Date.now();
+    const preamble =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="model"\r\n\r\n` +
+      `whisper-1\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="audio.${ext}"\r\n` +
+      `Content-Type: ${mimeType || "audio/webm"}\r\n\r\n`;
+    const closing = `\r\n--${boundary}--\r\n`;
+
+    const body = Buffer.concat([
+      Buffer.from(preamble, "utf-8"),
+      audioBuffer,
+      Buffer.from(closing, "utf-8"),
+    ]);
+
+    const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + apiKey
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
       },
-      body: formData
+      body,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return {
-        statusCode: response.status,
-        body: JSON.stringify(data)
-      };
+    if (!whisperRes.ok) {
+      const errText = await whisperRes.text();
+      console.error("Whisper error:", errText);
+      return { statusCode: 502, body: JSON.stringify({ error: "Transcription provider error" }) };
     }
+
+    const data = await whisperRes.json();
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ text: data.text })
+      body: JSON.stringify({ text: data.text }),
     };
-
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Server error: " + error.message })
-    };
+  } catch (err) {
+    console.error("transcribe.js error:", err);
+    return { statusCode: 500, body: JSON.stringify({ error: "Internal server error" }) };
   }
 };

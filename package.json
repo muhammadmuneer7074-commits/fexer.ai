@@ -1,0 +1,15 @@
+{
+    "name": "fexer-ai",
+    "version": "1.0.0",
+    "description": "Fexer AI - Production AI SaaS Platform",
+    "private": true,
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.45.0",
+        "stripe": "^16.8.0",
+        "openai": "^4.55.0",
+        "busboy": "^1.6.0"
+    }
+}

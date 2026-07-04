@@ -1,689 +1,874 @@
-// ════════════════════════════════════════════
-//  CHAT SECTION
-// ════════════════════════════════════════════
+// ============================================================
+// FEXER AI - MAIN APP LOGIC
+// ============================================================
 
-// ── Elements ──
-const chatMessages = document.getElementById("chatMessages");
-const userInput = document.getElementById("userInput");
-const actionBtn = document.getElementById("actionBtn");
-const micBtn = document.getElementById("micBtn");
-const attachBtn = document.getElementById("attachBtn");
-const attachMenu = document.getElementById("attachMenu");
-const imageInput = document.getElementById("imageInput");
-const fileUploadInput = document.getElementById("fileUploadInput");
-const imagePreviewArea = document.getElementById("imagePreviewArea");
-const chatList = document.getElementById("chatList");
-const sidebar = document.getElementById("sidebar");
-const sidebarOverlay = document.getElementById("sidebarOverlay");
-const menuToggle = document.getElementById("menuToggle");
-const sidebarCloseBtn = document.getElementById("sidebarCloseBtn");
-const chatSearchInput = document.getElementById("chatSearchInput");
-const sidebarNewChatBtn = document.getElementById("sidebarNewChatBtn");
-const ghostChatBtn = document.getElementById("ghostChatBtn");
-const chatOptionsWrapper = document.getElementById("chatOptionsWrapper");
-const chatOptionsMenuBtn = document.getElementById("chatOptionsMenuBtn");
-const bubbleNewChatBtn = document.getElementById("bubbleNewChatBtn");
-const chatOptionsDropdown = document.getElementById("chatOptionsDropdown");
-const optStarBtn = document.getElementById("optStarBtn");
-const optRenameBtn = document.getElementById("optRenameBtn");
-const optDeleteBtn = document.getElementById("optDeleteBtn");
-const starBtnLabel = document.getElementById("starBtnLabel");
-const choosePhotoBtn = document.getElementById("choosePhotoBtn");
-const takePhotoBtn = document.getElementById("takePhotoBtn");
-const chooseFileBtn = document.getElementById("chooseFileBtn");
-const toolsToggleMenu = document.getElementById("toolsToggleMenu");
-const webSearchToggleMenu = document.getElementById("webSearchToggleMenu");
-const voiceOverlay = document.getElementById("voiceOverlay");
-const voiceOrb = document.getElementById("voiceOrb");
-const voiceStatusText = document.getElementById("voiceStatusText");
-const closeVoiceOverlayBtn = document.getElementById("closeVoiceOverlayBtn");
-const cameraOverlay = document.getElementById("cameraOverlay");
-const cameraVideo = document.getElementById("cameraVideo");
-const cameraCanvas = document.getElementById("cameraCanvas");
-const cameraCancelBtn = document.getElementById("cameraCancelBtn");
-const cameraCaptureBtn = document.getElementById("cameraCaptureBtn");
-const cameraSwitchBtn = document.getElementById("cameraSwitchBtn");
+const SUPABASE_URL = "https://your-project.supabase.co"; // placeholder
+const SUPABASE_ANON_KEY = "placeholder-your-supabase-anon-key"; // placeholder
 
-// ── State ──
-let chats = {}, chatOrder = [], currentChatId = null;
-let isDraftChat = false, draftChat = null;
-let isTemporary = false, tempChat = null;
-let selectedImage = null, selectedFileContent = null, selectedFileName = null;
-let isWaiting = false, voiceOn = false, isListening = false, autoSpeak = false;
-let abortCtrl = null, currentPlayer = null;
-let appSettings = { deepThinking: false, deepSearch: false, toolsEnabled: true, voice: "auto" };
-const VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
-const randVoice = () => VOICES[Math.floor(Math.random() * VOICES.length)];
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function activeChat() {
-  if (isDraftChat) return draftChat;
-  if (isTemporary) return tempChat;
-  return chats[currentChatId];
-}
+let currentUser = null;
+let currentSession = null;
+let currentChatId = null;
+let chatMessages = []; // { role, content }
+let attachments = []; // { name, type, dataUrl }
+let mediaRecorder = null;
+let recordedChunks = [];
+let voiceActive = false;
+let silenceTimer = null;
 
-function chatVoice() {
-  if (appSettings.voice !== "auto") return appSettings.voice;
-  const c = activeChat();
-  if (!c.voice) { c.voice = randVoice(); if (!isDraftChat && !isTemporary) saveChats(); }
-  return c.voice;
-}
-
-let mediaStream = null, mediaRecorder = null, audioChunks = [];
-let audioCtx = null, analyserNode = null, maxTimer = null, spokenAbove = false;
-let camStream = null, camFacing = "user";
-
-const SVG = {
-  voice: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="10" x2="3" y2="14"/><line x1="7" y1="6" x2="7" y2="18"/><line x1="11" y1="3" x2="11" y2="21"/><line x1="15" y1="6" x2="15" y2="18"/><line x1="19" y1="10" x2="19" y2="14"/></svg>`,
-  send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`,
-  stop: `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`,
-  pdf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
-  dl: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
-  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
-  star: `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
-  bolt: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`
-};
-
-const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
-
-// ── Storage ──
-function saveChats() { try { localStorage.setItem("fexerChats", JSON.stringify({ chats, chatOrder })); } catch (e) { } }
-function loadChats() {
-  const s = localStorage.getItem("fexerChats");
-  if (s) { const p = JSON.parse(s); chats = p.chats || {}; chatOrder = p.chatOrder || []; }
-  chatOrder.length ? (currentChatId = chatOrder[0], renderChatList(), renderChatView()) : startDraft();
-}
-function saveSettings() { localStorage.setItem("fexerSettings", JSON.stringify(appSettings)); }
-function loadSettings() {
-  const s = localStorage.getItem("fexerSettings");
-  if (s) appSettings = Object.assign(appSettings, JSON.parse(s));
-  toolsToggleMenu.classList.toggle("on", appSettings.toolsEnabled);
-  webSearchToggleMenu.classList.toggle("on", appSettings.deepSearch);
-}
-
-// ── Draft / Temp ──
-function startDraft() {
-  isTemporary = false; tempChat = null;
-  isDraftChat = true; draftChat = { title: "New Chat", messages: [], voice: randVoice() };
-  currentChatId = null; renderChatList(); renderChatView(); updateHeader(); closeSidebar();
-}
-function startTemp() {
-  isDraftChat = false; draftChat = null; isTemporary = true;
-  tempChat = { title: "Temporary Chat", messages: [], voice: randVoice() };
-  renderChatList(); renderChatView(); updateHeader(); closeSidebar();
-}
-function exitTemp() { isTemporary = false; tempChat = null; }
-function promoteDraft() {
-  if (!isDraftChat) return;
-  const id = "chat_" + Date.now();
-  chats[id] = draftChat; chatOrder.unshift(id); currentChatId = id;
-  isDraftChat = false; draftChat = null;
-}
-
-ghostChatBtn.addEventListener("click", startTemp);
-
-function updateHeader() {
-  const c = activeChat(); const has = c && c.messages.length > 0;
-  ghostChatBtn.hidden = has; chatOptionsWrapper.hidden = !has;
-}
-
-// ── Chat ──
-function switchChat(id) {
-  isDraftChat = false; draftChat = null; exitTemp(); currentChatId = id;
-  renderChatList(); renderChatView(); updateHeader(); closeSidebar();
-}
-function deleteChat(id) {
-  delete chats[id]; chatOrder = chatOrder.filter(x => x !== id);
-  if (currentChatId === id) { chatOrder.length ? (currentChatId = chatOrder[0], isDraftChat = false, draftChat = null) : (saveChats(), startDraft(), renderAgentList(), undefined); }
-  saveChats(); renderChatList(); renderChatView(); updateHeader();
-}
-function renderChatList(q) {
-  chatList.innerHTML = "";
-  const qry = (q || "").toLowerCase();
-  let ids = chatOrder.filter(id => chats[id] && (!qry || chats[id].title.toLowerCase().includes(qry)));
-  ids.sort((a, b) => (chats[b].starred ? 1 : 0) - (chats[a].starred ? 1 : 0));
-  ids.forEach(id => {
-    const c = chats[id];
-    const item = document.createElement("div");
-    item.className = "chat-item" + (id === currentChatId && !isTemporary && !isDraftChat ? " active" : "");
-    const tw = document.createElement("span"); tw.className = "chat-item-title";
-    if (c.starred) { const si = document.createElement("span"); si.className = "chat-star"; si.innerHTML = SVG.star; tw.appendChild(si); }
-    const tt = document.createElement("span"); tt.className = "chat-item-title-text"; tt.textContent = c.title; tw.appendChild(tt);
-    item.appendChild(tw);
-    const del = document.createElement("button"); del.className = "chat-delete-btn"; del.innerHTML = SVG.trash;
-    del.addEventListener("click", e => { e.stopPropagation(); if (confirm("Delete?")) deleteChat(id); });
-    item.appendChild(del);
-    let pt = null, lp = false;
-    item.addEventListener("mousedown", () => { lp = false; pt = setTimeout(() => { lp = true; item.classList.add("show-delete"); }, 500); });
-    item.addEventListener("touchstart", () => { lp = false; pt = setTimeout(() => { lp = true; item.classList.add("show-delete"); }, 500); });
-    ["mouseup", "mouseleave", "touchend"].forEach(e => item.addEventListener(e, () => clearTimeout(pt)));
-    item.addEventListener("click", () => { if (lp) return; if (item.classList.contains("show-delete")) { item.classList.remove("show-delete"); return; } switchChat(id); });
-    chatList.appendChild(item);
-  });
-}
-chatSearchInput.addEventListener("input", () => renderChatList(chatSearchInput.value));
-
-function renderChatView() {
-  chatMessages.innerHTML = "";
-  const c = activeChat();
-  if (isTemporary) addChatBubble("🕶️ Temporary Chat — this conversation will not be saved.", "bot-message");
-  if (!c.messages.length) { if (!isTemporary) addChatBubble("Hi! I'm Fexer AI. Ask me anything.", "bot-message"); return; }
-  c.messages.forEach(m => addChatBubble(m.content, m.role === "user" ? "user-message" : "bot-message"));
-}
-
-// ── 3-dot Menu ──
-sidebarNewChatBtn.addEventListener("click", startDraft);
-bubbleNewChatBtn.addEventListener("click", startDraft);
-chatOptionsMenuBtn.addEventListener("click", e => {
-  e.stopPropagation();
-  if (isTemporary) { if (confirm("End temporary chat?")) { exitTemp(); startDraft(); } return; }
-  const c = chats[currentChatId]; if (c) starBtnLabel.textContent = c.starred ? "Unstar" : "Star";
-  chatOptionsDropdown.classList.toggle("show");
-});
-optStarBtn.addEventListener("click", () => {
-  chatOptionsDropdown.classList.remove("show");
-  if (!isDraftChat && !isTemporary && chats[currentChatId]) { chats[currentChatId].starred = !chats[currentChatId].starred; saveChats(); renderChatList(); }
-});
-optRenameBtn.addEventListener("click", () => {
-  chatOptionsDropdown.classList.remove("show");
-  if (!isDraftChat && !isTemporary && chats[currentChatId]) { const n = prompt("Rename:", chats[currentChatId].title); if (n?.trim()) { chats[currentChatId].title = n.trim(); saveChats(); renderChatList(); } }
-});
-optDeleteBtn.addEventListener("click", () => { chatOptionsDropdown.classList.remove("show"); if (confirm("Delete this chat?")) deleteChat(currentChatId); });
-document.addEventListener("click", e => {
-  if (!attachMenu.contains(e.target) && e.target !== attachBtn) attachMenu.classList.remove("show");
-  if (!chatOptionsDropdown.contains(e.target) && !chatOptionsMenuBtn.contains(e.target)) chatOptionsDropdown.classList.remove("show");
-});
-
-// ── Attach ──
-attachBtn.addEventListener("click", e => { e.stopPropagation(); attachMenu.classList.toggle("show"); });
-choosePhotoBtn.addEventListener("click", () => { imageInput.click(); attachMenu.classList.remove("show"); });
-takePhotoBtn.addEventListener("click", () => { attachMenu.classList.remove("show"); openCamera(); });
-chooseFileBtn.addEventListener("click", () => { fileUploadInput.click(); attachMenu.classList.remove("show"); });
-toolsToggleMenu.addEventListener("click", () => { appSettings.toolsEnabled = !appSettings.toolsEnabled; saveSettings(); toolsToggleMenu.classList.toggle("on", appSettings.toolsEnabled); });
-webSearchToggleMenu.addEventListener("click", () => { appSettings.deepSearch = !appSettings.deepSearch; saveSettings(); webSearchToggleMenu.classList.toggle("on", appSettings.deepSearch); });
-
-imageInput.addEventListener("change", e => {
-  const f = e.target.files[0]; if (!f) return;
-  selectedFileContent = null; selectedFileName = null;
-  if (f.type.startsWith("video/")) { extractFrame(f, b => { selectedImage = b; showImgPrev(b, true); updateBtn(); }); }
-  else { compressImg(f, b => { selectedImage = b; showImgPrev(b, false); updateBtn(); }); }
-  e.target.value = "";
-});
-fileUploadInput.addEventListener("change", e => {
-  const f = e.target.files[0]; if (!f) return; selectedImage = null;
-  const r = new FileReader();
-  r.onload = ev => { selectedFileContent = ev.target.result; selectedFileName = f.name; showFilePrev(f.name); updateBtn(); };
-  r.readAsText(f); e.target.value = "";
-});
-
-function compressImg(file, cb) {
-  const r = new FileReader(); r.onload = ev => { const img = new Image(); img.onload = () => { let w = img.width, h = img.height; if (w > 800) { h = Math.round(h * 800 / w); w = 800; } const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h); cb(c.toDataURL("image/jpeg", 0.7)); }; img.src = ev.target.result; }; r.readAsDataURL(file);
-}
-function extractFrame(file, cb) {
-  const v = document.createElement("video"); v.preload = "metadata"; v.muted = true; v.src = URL.createObjectURL(file);
-  v.addEventListener("loadeddata", () => { v.currentTime = Math.min(0.3, v.duration / 2); });
-  v.addEventListener("seeked", () => { let w = v.videoWidth, h = v.videoHeight; if (w > 800) { h = Math.round(h * 800 / w); w = 800; } const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(v, 0, 0, w, h); URL.revokeObjectURL(v.src); cb(c.toDataURL("image/jpeg", 0.7)); });
-}
-function showImgPrev(b, fromVideo) {
-  imagePreviewArea.innerHTML = `<div class="image-preview-chip"><img src="${b}" alt="preview">${fromVideo ? '<span class="video-frame-badge">Video frame</span>' : ''}<button class="remove-preview-btn" id="rmPrev">×</button></div>`;
-  imagePreviewArea.classList.add("show"); document.getElementById("rmPrev").addEventListener("click", clearPrev);
-}
-function showFilePrev(name) {
-  imagePreviewArea.innerHTML = `<div class="file-preview-chip">${SVG.pdf}<span class="file-chip-name">${esc(name)}</span><button class="remove-preview-btn" id="rmPrev" style="position:static;margin-left:auto;">×</button></div>`;
-  imagePreviewArea.classList.add("show"); document.getElementById("rmPrev").addEventListener("click", clearPrev);
-}
-function clearPrev() { selectedImage = null; selectedFileContent = null; selectedFileName = null; imagePreviewArea.innerHTML = ""; imagePreviewArea.classList.remove("show"); updateBtn(); }
-
-// ── Camera ──
-async function openCamera() { cameraOverlay.classList.add("show"); camFacing = "user"; await startCam(); }
-async function startCam() {
-  if (camStream) camStream.getTracks().forEach(t => t.stop());
-  try { camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: camFacing } }); cameraVideo.srcObject = camStream; }
-  catch (e) { addChatBubble("⚠️ Camera access denied.", "bot-message"); closeCamera(); }
-}
-cameraSwitchBtn.addEventListener("click", () => { camFacing = camFacing === "user" ? "environment" : "user"; startCam(); });
-cameraCaptureBtn.addEventListener("click", () => {
-  cameraCanvas.width = cameraVideo.videoWidth; cameraCanvas.height = cameraVideo.videoHeight;
-  cameraCanvas.getContext("2d").drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
-  const b = cameraCanvas.toDataURL("image/jpeg", 0.8);
-  selectedImage = b; selectedFileContent = null; selectedFileName = null; showImgPrev(b, false); updateBtn(); closeCamera();
-});
-cameraCancelBtn.addEventListener("click", closeCamera);
-function closeCamera() { cameraOverlay.classList.remove("show"); if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; } }
-
-// ── Mic ──
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recog = null;
-if (SR) {
-  recog = new SR(); recog.lang = "en-US"; recog.continuous = false; recog.interimResults = false;
-  recog.onresult = e => { userInput.value = e.results[0][0].transcript; updateBtn(); };
-  recog.onend = () => { isListening = false; micBtn.classList.remove("listening"); };
-  recog.onerror = () => { isListening = false; micBtn.classList.remove("listening"); };
-  micBtn.addEventListener("click", () => { if (isListening) { recog.stop(); } else { try { isListening = true; micBtn.classList.add("listening"); recog.start(); } catch (e) { isListening = false; } } });
-} else { micBtn.style.display = "none"; }
-
-// ── Action Button ──
-function updateBtn() {
-  actionBtn.classList.remove("is-send", "is-stop", "is-voice-active");
-  if (isWaiting) { actionBtn.innerHTML = SVG.stop; actionBtn.classList.add("is-stop"); actionBtn.onclick = () => { if (abortCtrl) abortCtrl.abort(); }; return; }
-  if (voiceOn) { actionBtn.innerHTML = SVG.voice; actionBtn.classList.add("is-voice-active"); actionBtn.onclick = stopVoice; return; }
-  const has = userInput.value.trim() || selectedImage || selectedFileContent;
-  if (has) { actionBtn.innerHTML = SVG.send; actionBtn.classList.add("is-send"); actionBtn.onclick = sendMsg; }
-  else { actionBtn.innerHTML = SVG.voice; actionBtn.onclick = startVoice; }
-}
-userInput.addEventListener("input", updateBtn);
-userInput.addEventListener("keypress", e => { if (e.key === "Enter") sendMsg(); });
-
-// ── Send ──
-async function sendMsg() {
-  let txt = userInput.value.trim();
-  if (!txt && !selectedImage && !selectedFileContent) return;
-  promoteDraft();
-  const chat = activeChat();
-  if (selectedFileContent) { const b = "Attached file: " + selectedFileName + "\n```\n" + selectedFileContent.slice(0, 20000) + "\n```"; txt = txt ? txt + "\n\n" + b : b; }
-  let content = selectedImage ? [((txt ? [{ type: "text", text: txt }] : [])), { type: "image_url", image_url: { url: selectedImage } }] : txt;
-  if (!chat.messages.length) { const src = userInput.value.trim() || selectedFileName || "Image"; chat.title = src.length > 30 ? src.slice(0, 30) + "..." : src; if (!isTemporary) renderChatList(); }
-  addChatBubble(content, "user-message"); chat.messages.push({ role: "user", content });
-  if (!isTemporary) saveChats(); updateHeader();
-  userInput.value = ""; clearPrev();
-  isWaiting = true; setDis(true); updateBtn(); showTyping();
-  if (voiceOn) orbState("thinking");
-  abortCtrl = new AbortController();
-  try {
-    const res = await fetch("/.netlify/functions/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: chat.messages, voiceMode: voiceOn, deepThinking: appSettings.deepThinking, deepSearch: appSettings.deepSearch, customInstructions: "", toolsEnabled: appSettings.toolsEnabled }), signal: abortCtrl.signal });
-    if (!res.ok) { const d = await res.json(); errBubble(res.status, d); removeTyping(); done(); return; }
-    const data = await res.json(); const reply = data.choices[0].message.content;
-    removeTyping(); addChatBubble(reply, "bot-message"); chat.messages.push({ role: "assistant", content: reply });
-    if (!isTemporary) saveChats(); done();
-    if (voiceOn) { orbState("speaking"); await tts(speakable(reply)); if (voiceOn) { orbState("listening"); startRecording(); } }
-    else if (autoSpeak) { tts(speakable(reply)); }
-  } catch (e) { removeTyping(); if (e.name === "AbortError") addChatBubble("⏹️ Stopped.", "bot-message"); else { addChatBubble("⚠️ Connection error.", "bot-message"); console.error(e); } done(); }
-}
-function done() { isWaiting = false; abortCtrl = null; setDis(false); updateBtn(); }
-function setDis(v) { userInput.disabled = v; attachBtn.disabled = v; micBtn.disabled = v; }
-function errBubble(code, d) { const m = { 401: "⚠️ Invalid API key.", 429: "⚠️ Rate limit exceeded.", 500: "⚠️ OpenAI server error.", 503: "⚠️ OpenAI server error." }; addChatBubble(m[code] || "⚠️ Something went wrong.", "bot-message"); }
-
-// ── Render Bubble ──
-function addChatBubble(content, cls) {
-  const div = document.createElement("div"); div.className = "message " + cls;
-  if (Array.isArray(content)) {
-    content.forEach(p => {
-      if (p.type === "text") { const t = document.createElement("div"); t.innerHTML = cls === "bot-message" ? marked.parse(p.text) : esc(p.text); div.appendChild(t); }
-      else if (p.type === "image_url") { const img = document.createElement("img"); img.src = p.image_url.url; img.className = "message-image"; div.appendChild(img); }
-    });
-  } else if (cls === "bot-message") {
-    const im = typeof content === "string" ? content.match(/^\{\{FEXER_IMAGE:([\s\S]+?)\}\}\n?([\s\S]*)$/) : null;
-    if (im) {
-      const img = document.createElement("img"); img.src = "data:image/png;base64," + im[1]; img.className = "message-image"; div.appendChild(img);
-      if (im[2].trim()) { const c = document.createElement("div"); c.textContent = im[2].trim(); div.appendChild(c); }
-      const acts = document.createElement("div"); acts.className = "message-actions"; const db = document.createElement("button"); db.className = "msg-action-btn"; db.innerHTML = SVG.dl; db.addEventListener("click", () => dlImage(im[1])); acts.appendChild(db); div.appendChild(acts);
-    } else {
-      div.innerHTML = marked.parse(content);
-      const acts = document.createElement("div"); acts.className = "message-actions"; const pb = document.createElement("button"); pb.className = "msg-action-btn"; pb.innerHTML = SVG.pdf; pb.addEventListener("click", () => dlPDF(content)); acts.appendChild(pb); div.appendChild(acts);
-    }
-  } else { div.textContent = content; }
-  chatMessages.appendChild(div); chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-function showTyping() { const d = document.createElement("div"); d.className = "message bot-message typing-indicator"; d.id = "typingDot"; d.innerHTML = "<span></span><span></span><span></span>"; chatMessages.appendChild(d); chatMessages.scrollTop = chatMessages.scrollHeight; }
-function removeTyping() { const d = document.getElementById("typingDot"); if (d) d.remove(); }
-
-// ── Sidebar ──
-menuToggle.addEventListener("click", () => { sidebar.classList.toggle("open"); sidebarOverlay.classList.toggle("active"); });
-sidebarOverlay.addEventListener("click", closeSidebar);
-sidebarCloseBtn.addEventListener("click", closeSidebar);
-function closeSidebar() { sidebar.classList.remove("open"); sidebarOverlay.classList.remove("active"); }
-
-// ── Voice ──
-closeVoiceOverlayBtn.addEventListener("click", stopVoice);
-async function startVoice() { if (!navigator.mediaDevices) { addChatBubble("⚠️ Microphone not available.", "bot-message"); return; } voiceOn = true; voiceOverlay.classList.add("show"); orbState("listening"); updateBtn(); await startRecording(); }
-function stopVoice() { voiceOn = false; voiceOverlay.classList.remove("show"); if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); cleanAudio(); if (currentPlayer) { currentPlayer.pause(); currentPlayer = null; } if (abortCtrl) abortCtrl.abort(); updateBtn(); }
-function orbState(s) { voiceOrb.classList.remove("thinking", "speaking"); if (s === "thinking") { voiceOrb.classList.add("thinking"); voiceStatusText.textContent = "Thinking..."; } else if (s === "speaking") { voiceOrb.classList.add("speaking"); voiceStatusText.textContent = "Speaking..."; } else { voiceStatusText.textContent = "Listening..."; } }
-async function startRecording() {
-  try { mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { addChatBubble("⚠️ Microphone access denied.", "bot-message"); stopVoice(); return; }
-  audioChunks = []; spokenAbove = false; mediaRecorder = new MediaRecorder(mediaStream);
-  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-  mediaRecorder.onstop = () => { cleanAudio(); if (!voiceOn) return; const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType }); if (blob.size > 1000) processAudio(blob); else startRecording(); };
-  mediaRecorder.start(); orbState("listening"); watchSilence();
-  maxTimer = setTimeout(() => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); }, 15000);
-}
-function watchSilence() {
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const src = audioCtx.createMediaStreamSource(mediaStream); analyserNode = audioCtx.createAnalyser(); analyserNode.fftSize = 512; src.connect(analyserNode);
-  const arr = new Uint8Array(analyserNode.frequencyBinCount); let silStart = null;
-  function chk() { if (!mediaRecorder || mediaRecorder.state !== "recording") return; analyserNode.getByteFrequencyData(arr); const avg = arr.reduce((a, b) => a + b, 0) / arr.length; if (avg > 12) { spokenAbove = true; silStart = null; } else if (spokenAbove) { if (!silStart) silStart = Date.now(); if (Date.now() - silStart > 1200) { mediaRecorder.stop(); return; } } requestAnimationFrame(chk); }
-  requestAnimationFrame(chk);
-}
-function cleanAudio() { if (maxTimer) { clearTimeout(maxTimer); maxTimer = null; } if (audioCtx) { audioCtx.close(); audioCtx = null; } if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; } }
-async function processAudio(blob) {
-  orbState("thinking"); const b64 = await blobTo64(blob);
-  try { const res = await fetch("/.netlify/functions/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audioBase64: b64, mimeType: blob.type }) }); if (!res.ok) throw new Error("fail"); const d = await res.json(); const txt = (d.text || "").trim(); if (!txt) { if (voiceOn) startRecording(); return; } userInput.value = txt; sendMsg(); } catch (e) { if (voiceOn) { addChatBubble("⚠️ Couldn't understand. Try again.", "bot-message"); startRecording(); } }
-}
-const blobTo64 = blob => new Promise(r => { const fr = new FileReader(); fr.onloadend = () => r(fr.result.split(",")[1]); fr.readAsDataURL(blob); });
-async function tts(text) { return new Promise(async r => { try { const res = await fetch("/.netlify/functions/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: stripMd(text), voice: chatVoice() }) }); if (!res.ok) { r(); return; } const d = await res.json(); const au = new Audio("data:audio/mp3;base64," + d.audioBase64); currentPlayer = au; au.onended = () => { currentPlayer = null; r(); }; au.onerror = () => { currentPlayer = null; r(); }; au.play(); } catch (e) { r(); } }); }
-const speakable = t => { const m = t.match(/^\{\{FEXER_IMAGE:[\s\S]+?\}\}\n?([\s\S]*)$/); return m ? (m[1] || "Here's the image.") : t; };
-const stripMd = t => t.replace(/```[\s\S]*?```/g, "").replace(/[*_`#>~-]/g, "").replace(/\n+/g, ". ");
-
-function dlPDF(text) { const doc = new jspdf.jsPDF(); const plain = text.replace(/```([\s\S]*?)```/g, (_, c) => c.trim()).replace(/^#{1,6}\s*/gm, "").replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/`([^`]*)`/g, "$1").replace(/^[-*]\s+/gm, "• ").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"); const lines = doc.splitTextToSize(plain, 180); doc.setFontSize(11); let y = 20; lines.forEach(l => { if (y > doc.internal.pageSize.height - 15) { doc.addPage(); y = 20; } doc.text(l, 15, y); y += 7; }); doc.save("Fexer-AI.pdf"); }
-function dlImage(b64) { const a = document.createElement("a"); a.href = "data:image/png;base64," + b64; a.download = "Fexer-AI-Image.png"; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
-
-
-// ════════════════════════════════════════════
-//  NAVIGATION
-// ════════════════════════════════════════════
-
-document.querySelectorAll(".nav-tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    tab.classList.add("active");
-    document.getElementById("view-" + tab.dataset.view).classList.add("active");
-    if (tab.dataset.view === "agents") renderAgentList();
-  });
-});
-
-
-// ════════════════════════════════════════════
-//  AGENTS SECTION
-// ════════════════════════════════════════════
-
-let agents = [];
-let currentAgentId = null;
-let currentPlan = null;
-
-const agentsList = document.getElementById("agentsList");
-const agentsMain = document.getElementById("agentsMain");
-const agentPromptInput = document.getElementById("agentPromptInput");
-const agentSubmitBtn = document.getElementById("agentSubmitBtn");
-const newAgentBtn = document.getElementById("newAgentBtn");
-const planAgentName = document.getElementById("planAgentName");
-const planDescription = document.getElementById("planDescription");
-const planSteps = document.getElementById("planSteps");
-const planNodes = document.getElementById("planNodes");
-const credentialsSection = document.getElementById("credentialsSection");
-const credentialsList = document.getElementById("credentialsList");
-const backToWelcomeBtn = document.getElementById("backToWelcomeBtn");
-const deployAgentBtn = document.getElementById("deployAgentBtn");
-const planningSteps = document.getElementById("planningSteps");
-const dashAgentName = document.getElementById("dashAgentName");
-const dashAgentDesc = document.getElementById("dashAgentDesc");
-const dashStatus = document.getElementById("dashStatus");
-const dashN8nLink = document.getElementById("dashN8nLink");
-const dashRefreshBtn = document.getElementById("dashRefreshBtn");
-const dashDeleteBtn = document.getElementById("dashDeleteBtn");
-const executionsList = document.getElementById("executionsList");
-const statTotal = document.getElementById("statTotal");
-const statSuccess = document.getElementById("statSuccess");
-const statFailed = document.getElementById("statFailed");
-const statLast = document.getElementById("statLast");
-
-// ── Storage ──
-function saveAgents() { try { localStorage.setItem("fexerAgents", JSON.stringify(agents)); } catch (e) { } }
-function loadAgents() { const s = localStorage.getItem("fexerAgents"); if (s) agents = JSON.parse(s); renderAgentList(); }
-
-// ── State Switching ──
-function showAgentState(name) {
-  document.querySelectorAll(".agent-state").forEach(s => s.classList.remove("active"));
-  document.getElementById("state-" + name).classList.add("active");
-}
-
-// ── Render Agent List ──
-function renderAgentList() {
-  if (!agents.length) {
-    agentsList.innerHTML = `<div class="agents-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><p>No agents yet</p><span>Create your first AI agent</span></div>`;
+// ------------------------------------------------------------
+// AUTH GUARD
+// ------------------------------------------------------------
+(async () => {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) {
+    window.location.href = "/auth.html";
     return;
   }
-  agentsList.innerHTML = "";
-  agents.forEach(agent => {
-    const item = document.createElement("div");
-    item.className = "agent-list-item" + (agent.id === currentAgentId ? " active" : "");
-    item.innerHTML = `
-      <div class="agent-list-icon">${SVG.bolt}</div>
-      <div class="agent-list-info">
-        <div class="agent-list-name">${esc(agent.name)}</div>
-        <div class="agent-list-status ${agent.active ? 'active' : ''}">${agent.active ? '🟢 Active' : '⚪ Inactive'}</div>
-      </div>
-      <button class="agent-list-del" title="Delete">${SVG.trash}</button>
-    `;
-    item.querySelector(".agent-list-del").addEventListener("click", e => {
-      e.stopPropagation();
-      if (confirm("Delete this agent?")) {
-        agents = agents.filter(a => a.id !== agent.id);
-        saveAgents();
-        if (currentAgentId === agent.id) { currentAgentId = null; showAgentState("welcome"); }
-        renderAgentList();
-      }
-    });
-    item.addEventListener("click", e => {
-      if (e.target.closest(".agent-list-del")) return;
-      currentAgentId = agent.id;
-      renderAgentList();
-      showAgentDashboard(agent);
-    });
-    agentsList.appendChild(item);
-  });
-}
+  currentSession = data.session;
+  currentUser = data.session.user;
+  document.getElementById("user-email").textContent = currentUser.email;
+  document.getElementById("user-avatar").textContent = (currentUser.email || "U")[0].toUpperCase();
 
-// ── Welcome: example chips ──
-document.querySelectorAll(".example-chip").forEach(chip => {
-  chip.addEventListener("click", () => { agentPromptInput.value = chip.dataset.prompt; agentPromptInput.focus(); });
+  await loadCredits();
+  await loadChatList();
+  await loadAgentList();
+})();
+
+supabase.auth.onAuthStateChange((event, session) => {
+  currentSession = session;
+  if (!session) window.location.href = "/auth.html";
 });
 
-newAgentBtn.addEventListener("click", () => { currentAgentId = null; renderAgentList(); showAgentState("welcome"); });
+function authHeaders() {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${currentSession?.access_token}`,
+  };
+}
 
-// ── Submit Prompt → Plan ──
-agentSubmitBtn.addEventListener("click", buildAgent);
-agentPromptInput.addEventListener("keypress", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); buildAgent(); } });
+// ------------------------------------------------------------
+// SIDEBAR: collapse / mobile toggle
+// ------------------------------------------------------------
+document.getElementById("collapse-sidebar-btn").onclick = () => {
+  document.getElementById("sidebar").classList.toggle("collapsed");
+};
 
-async function buildAgent() {
-  const prompt = agentPromptInput.value.trim();
-  if (!prompt) return;
+["open-sidebar-btn", "open-sidebar-btn-2"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.onclick = () => document.getElementById("sidebar").classList.toggle("mobile-open");
+});
 
-  agentSubmitBtn.disabled = true;
-  showAgentState("planning");
+// ------------------------------------------------------------
+// SIDEBAR TABS (Chats / Agents)
+// ------------------------------------------------------------
+document.querySelectorAll(".sidebar-tab").forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll(".sidebar-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
 
-  // Animate planning steps
-  const steps = planningSteps.querySelectorAll(".plan-step");
-  let si = 0;
-  const stepTimer = setInterval(() => {
-    if (si > 0) { steps[si - 1].classList.remove("active"); steps[si - 1].classList.add("done"); }
-    if (si < steps.length) { steps[si].classList.add("active"); si++; }
-    else { clearInterval(stepTimer); }
-  }, 700);
+    const target = tab.dataset.tab;
+    document.getElementById("chat-list-section").classList.toggle("hidden", target !== "chat");
+    document.getElementById("agent-list-section").classList.toggle("hidden", target !== "agents");
+
+    document.getElementById("chat-view").classList.toggle("active", target === "chat");
+    document.getElementById("agents-view").classList.toggle("active", target === "agents");
+  };
+});
+
+// ------------------------------------------------------------
+// LOGOUT
+// ------------------------------------------------------------
+document.getElementById("logout-btn").onclick = async () => {
+  await supabase.auth.signOut();
+  window.location.href = "/auth.html";
+};
+
+// ------------------------------------------------------------
+// CREDITS
+// ------------------------------------------------------------
+async function loadCredits() {
+  try {
+    const res = await fetch("/.netlify/functions/credits-get", { headers: authHeaders() });
+    const data = await res.json();
+
+    const fill = document.getElementById("credits-fill");
+    const text = document.getElementById("credits-text");
+
+    if (data.limit === "unlimited") {
+      fill.style.width = "100%";
+      text.textContent = "Unlimited";
+    } else {
+      const pct = Math.min(100, (data.used / data.limit) * 100);
+      fill.style.width = `${pct}%`;
+      text.textContent = `${data.used} / ${data.limit} used`;
+    }
+  } catch (err) {
+    console.error("Failed to load credits:", err);
+  }
+}
+
+async function useCredit() {
+  try {
+    const res = await fetch("/.netlify/functions/credits-use", { method: "POST", headers: authHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.allowed) {
+      openUpgradeModal();
+      return false;
+    }
+
+    loadCredits();
+    return true;
+  } catch (err) {
+    console.error("Credit check failed:", err);
+    return false;
+  }
+}
+
+// ------------------------------------------------------------
+// CHAT LIST (sidebar)
+// ------------------------------------------------------------
+async function loadChatList() {
+  try {
+    const { data: chats, error } = await supabase
+      .from("chats")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .eq("is_draft", false)
+      .order("updated_at", { ascending: false });
+
+    if (error) throw error;
+
+    const starred = chats.filter(c => c.is_starred);
+    const recent = chats.filter(c => !c.is_starred);
+
+    renderChatList("starred-chats", starred);
+    renderChatList("recent-chats", recent);
+  } catch (err) {
+    console.error("Failed to load chats:", err);
+  }
+}
+
+function renderChatList(containerId, chats) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+
+  chats.forEach(chat => {
+    const item = document.createElement("div");
+    item.className = "chat-list-item" + (chat.id === currentChatId ? " active" : "");
+    item.innerHTML = `
+      <span class="title">${escapeHtml(chat.title)}</span>
+      <div class="item-actions">
+        <button class="star-item-btn" title="${chat.is_starred ? "Unstar" : "Star"}">${chat.is_starred ? "★" : "☆"}</button>
+        <button class="rename-item-btn" title="Rename">✎</button>
+        <button class="delete-item-btn" title="Delete">🗑</button>
+      </div>
+    `;
+
+    item.querySelector(".title").onclick = () => openChat(chat.id, chat.title);
+    item.querySelector(".star-item-btn").onclick = (e) => { e.stopPropagation(); toggleStarChat(chat.id, !chat.is_starred); };
+    item.querySelector(".rename-item-btn").onclick = (e) => { e.stopPropagation(); renameChat(chat.id, chat.title); };
+    item.querySelector(".delete-item-btn").onclick = (e) => { e.stopPropagation(); deleteChat(chat.id); };
+
+    container.appendChild(item);
+  });
+}
+
+async function toggleStarChat(chatId, starred) {
+  await supabase.from("chats").update({ is_starred: starred }).eq("id", chatId);
+  loadChatList();
+}
+
+async function renameChat(chatId, oldTitle) {
+  const newTitle = prompt("Rename chat:", oldTitle);
+  if (!newTitle || newTitle.trim() === "") return;
+  await supabase.from("chats").update({ title: newTitle.trim() }).eq("id", chatId);
+  loadChatList();
+  if (chatId === currentChatId) document.getElementById("chat-title").textContent = newTitle.trim();
+}
+
+async function deleteChat(chatId) {
+  if (!confirm("Delete this chat permanently?")) return;
+  await supabase.from("chats").delete().eq("id", chatId);
+  if (chatId === currentChatId) startNewChat();
+  loadChatList();
+}
+
+async function openChat(chatId, title) {
+  currentChatId = chatId;
+  document.getElementById("chat-title").textContent = title;
+  document.getElementById("sidebar").classList.remove("mobile-open");
+
+  const { data: messages, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("chat_id", chatId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Failed to load messages:", error);
+    return;
+  }
+
+  chatMessages = messages.map(m => ({ role: m.role, content: m.content }));
+  renderAllMessages();
+  loadChatList();
+
+  const { data: chat } = await supabase.from("chats").select("is_starred").eq("id", chatId).single();
+  document.getElementById("star-chat-btn").textContent = chat?.is_starred ? "★" : "☆";
+}
+
+// ------------------------------------------------------------
+// NEW CHAT (draft/ghost until first message sent)
+// ------------------------------------------------------------
+document.getElementById("new-chat-btn").onclick = startNewChat;
+
+function startNewChat() {
+  currentChatId = null;
+  chatMessages = [];
+  attachments = [];
+  document.getElementById("chat-title").textContent = "New Chat";
+  document.getElementById("star-chat-btn").textContent = "☆";
+  renderAttachmentPreview();
+  renderAllMessages();
+}
+
+// ------------------------------------------------------------
+// STAR CURRENT CHAT
+// ------------------------------------------------------------
+document.getElementById("star-chat-btn").onclick = async () => {
+  if (!currentChatId) return;
+  const btn = document.getElementById("star-chat-btn");
+  const isStarred = btn.textContent === "★";
+  await toggleStarChat(currentChatId, !isStarred);
+  btn.textContent = !isStarred ? "★" : "☆";
+};
+
+// ------------------------------------------------------------
+// MESSAGE RENDERING
+// ------------------------------------------------------------
+function renderAllMessages() {
+  const container = document.getElementById("messages");
+  container.innerHTML = "";
+
+  if (chatMessages.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" id="empty-state">
+        <div class="empty-orb"></div>
+        <h2>What can I help with, Muhammad?</h2>
+        <p>Ask anything, generate images, search the web, or talk with voice.</p>
+      </div>`;
+    return;
+  }
+
+  chatMessages.forEach(msg => appendMessageToDOM(msg.role, msg.content));
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendMessageToDOM(role, content) {
+  const container = document.getElementById("messages");
+  const emptyState = document.getElementById("empty-state");
+  if (emptyState) emptyState.remove();
+
+  const div = document.createElement("div");
+  div.className = `message ${role}`;
+  div.innerHTML = formatMessageContent(content);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function formatMessageContent(content) {
+  let html = escapeHtml(content);
+  html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`);
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  html = html.replace(/\n/g, "<br>");
+  return html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ------------------------------------------------------------
+// SENDING MESSAGES
+// ------------------------------------------------------------
+const chatInput = document.getElementById("chat-input");
+const sendBtn = document.getElementById("send-btn");
+
+chatInput.addEventListener("input", () => {
+  chatInput.style.height = "auto";
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + "px";
+});
+
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+sendBtn.onclick = sendMessage;
+
+let webSearchEnabled = false;
+document.getElementById("websearch-toggle").onclick = () => {
+  webSearchEnabled = !webSearchEnabled;
+  document.getElementById("websearch-toggle").classList.toggle("active", webSearchEnabled);
+};
+
+async function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text && attachments.length === 0) return;
+
+  const allowed = await useCredit();
+  if (!allowed) return;
+
+  if (!currentChatId) {
+    const { data: newChat, error } = await supabase
+      .from("chats")
+      .insert({ user_id: currentUser.id, title: text.slice(0, 40) || "New Chat", is_draft: false })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to create chat:", error);
+      return;
+    }
+    currentChatId = newChat.id;
+    document.getElementById("chat-title").textContent = newChat.title;
+    loadChatList();
+  }
+
+  const userContent = text;
+  chatMessages.push({ role: "user", content: userContent });
+  appendMessageToDOM("user", userContent);
+
+  chatInput.value = "";
+  chatInput.style.height = "auto";
+  const sentAttachments = [...attachments];
+  attachments = [];
+  renderAttachmentPreview();
+
+  const loadingDiv = document.createElement("div");
+  loadingDiv.className = "message assistant message-loading";
+  loadingDiv.innerHTML = "<span></span><span></span><span></span>";
+  document.getElementById("messages").appendChild(loadingDiv);
+  document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
 
   try {
-    const res = await fetch("/.netlify/functions/agent-plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
-    const data = await res.json();
-    clearInterval(stepTimer);
-    steps.forEach(s => { s.classList.remove("active"); s.classList.add("done"); });
-
-    if (!res.ok || !data.plan) throw new Error(data.error || "Planning failed");
-
-    currentPlan = { prompt, ...data.plan };
-    agentSubmitBtn.disabled = false;
-    showPlanAndCredentials(data.plan);
-
-  } catch (e) {
-    clearInterval(stepTimer);
-    agentSubmitBtn.disabled = false;
-    showAgentState("welcome");
-    alert("❌ Planning failed: " + e.message);
-  }
-}
-
-function showPlanAndCredentials(plan) {
-  planAgentName.textContent = plan.agentName || "Your Agent";
-  planDescription.textContent = plan.description || "";
-
-  planSteps.innerHTML = (plan.steps || []).map(s => `<li>${esc(s)}</li>`).join("");
-  planNodes.innerHTML = (plan.n8nNodes || []).map(n => `<span class="plan-tag">${esc(n)}</span>`).join("");
-
-  // Build credential inputs
-  credentialsList.innerHTML = "";
-  const needsCreds = (plan.services || []).filter(s => s.credentialType !== "none");
-
-  if (!needsCreds.length) {
-    credentialsSection.style.display = "none";
-  } else {
-    credentialsSection.style.display = "block";
-    needsCreds.forEach(svc => {
-      const item = document.createElement("div");
-      item.className = "cred-item";
-      item.innerHTML = `
-        <div class="cred-item-header">
-          <div class="cred-service-icon">🔌</div>
-          <div>
-            <div class="cred-service-name">${esc(svc.name)}</div>
-            <div class="cred-reason">${esc(svc.reason || "")}</div>
-          </div>
-        </div>
-        <div class="cred-input-row">
-          <input type="password" class="cred-input" placeholder="${esc(svc.credentialLabel || svc.name + ' Key')}" data-key="${esc(svc.credentialKey)}">
-          ${svc.getUrl ? `<a href="${esc(svc.getUrl)}" target="_blank" class="cred-get-btn">Get Key →</a>` : ""}
-        </div>
-      `;
-      credentialsList.appendChild(item);
+    const res = await fetch("/.netlify/functions/chat", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        messages: chatMessages,
+        chatId: currentChatId,
+        webSearch: webSearchEnabled,
+        attachments: sentAttachments,
+      }),
     });
-  }
 
-  showAgentState("credentials");
+    const data = await res.json();
+    loadingDiv.remove();
+
+    if (!res.ok) {
+      appendMessageToDOM("assistant", `⚠️ ${data.error || "Something went wrong."}`);
+      return;
+    }
+
+    chatMessages.push({ role: "assistant", content: data.reply });
+    appendMessageToDOM("assistant", data.reply);
+  } catch (err) {
+    loadingDiv.remove();
+    appendMessageToDOM("assistant", "⚠️ Network error. Please try again.");
+    console.error(err);
+  }
 }
 
-// ── Back Button ──
-backToWelcomeBtn.addEventListener("click", () => showAgentState("welcome"));
+// ------------------------------------------------------------
+// FILE ATTACHMENTS
+// ------------------------------------------------------------
+document.getElementById("attach-btn").onclick = () => document.getElementById("file-input").click();
 
-// ── Deploy Agent ──
-deployAgentBtn.addEventListener("click", async () => {
-  if (!currentPlan) return;
+document.getElementById("file-input").addEventListener("change", async (e) => {
+  const files = Array.from(e.target.files);
+  for (const file of files) {
+    const dataUrl = await fileToDataUrl(file);
+    attachments.push({ name: file.name, type: file.type, dataUrl });
+  }
+  renderAttachmentPreview();
+  e.target.value = "";
+});
 
-  // Collect credentials
-  const credentials = {};
-  credentialsList.querySelectorAll(".cred-input").forEach(input => {
-    if (input.value.trim()) credentials[input.dataset.key] = input.value.trim();
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
+}
 
-  deployAgentBtn.disabled = true;
-  showAgentState("deploying");
-  animateDeploySteps();
+function renderAttachmentPreview() {
+  const container = document.getElementById("attachment-preview");
+  container.innerHTML = "";
+  attachments.forEach((att, idx) => {
+    const chip = document.createElement("div");
+    chip.className = "attachment-chip";
+    chip.innerHTML = `<span>${escapeHtml(att.name)}</span><button data-idx="${idx}">×</button>`;
+    chip.querySelector("button").onclick = () => {
+      attachments.splice(idx, 1);
+      renderAttachmentPreview();
+    };
+    container.appendChild(chip);
+  });
+}
+
+// ------------------------------------------------------------
+// CAMERA CAPTURE
+// ------------------------------------------------------------
+const cameraModal = document.getElementById("camera-modal");
+const cameraVideo = document.getElementById("camera-video");
+let cameraStream = null;
+
+document.getElementById("camera-btn").onclick = async () => {
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    cameraVideo.srcObject = cameraStream;
+    cameraModal.classList.add("show");
+  } catch (err) {
+    alert("Camera access denied or unavailable.");
+  }
+};
+
+document.getElementById("close-camera-modal").onclick = closeCameraModal;
+
+function closeCameraModal() {
+  cameraModal.classList.remove("show");
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+}
+
+document.getElementById("capture-photo-btn").onclick = () => {
+  const canvas = document.getElementById("camera-canvas");
+  canvas.width = cameraVideo.videoWidth;
+  canvas.height = cameraVideo.videoHeight;
+  canvas.getContext("2d").drawImage(cameraVideo, 0, 0);
+  const dataUrl = canvas.toDataURL("image/png");
+  attachments.push({ name: "camera-photo.png", type: "image/png", dataUrl });
+  renderAttachmentPreview();
+  closeCameraModal();
+};
+
+// ------------------------------------------------------------
+// VOICE CHAT (record -> transcribe -> chat -> speak)
+// ------------------------------------------------------------
+const voiceOverlay = document.getElementById("voice-overlay");
+const voiceStatus = document.getElementById("voice-status");
+
+document.getElementById("voice-btn").onclick = startVoiceChat;
+document.getElementById("voice-close-btn").onclick = stopVoiceChat;
+
+async function startVoiceChat() {
+  const allowed = await useCredit();
+  if (!allowed) return;
+
+  voiceActive = true;
+  voiceOverlay.classList.add("show");
+  voiceStatus.textContent = "Listening...";
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    recordedChunks = [];
+
+    mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+    mediaRecorder.onstop = handleVoiceRecordingStop;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    function checkSilence() {
+      if (!voiceActive) return;
+      analyser.getByteFrequencyData(dataArray);
+      const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+      if (volume < 8) {
+        if (!silenceTimer) {
+          silenceTimer = setTimeout(() => {
+            if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+          }, 1500);
+        }
+      } else {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+      }
+      if (voiceActive) requestAnimationFrame(checkSilence);
+    }
+
+    mediaRecorder.start();
+    checkSilence();
+  } catch (err) {
+    alert("Microphone access denied or unavailable.");
+    stopVoiceChat();
+  }
+}
+
+async function handleVoiceRecordingStop() {
+  if (!voiceActive) return;
+  voiceStatus.textContent = "Thinking...";
+
+  const blob = new Blob(recordedChunks, { type: "audio/webm" });
+  const base64 = await blobToBase64(blob);
+
+  try {
+    const transcribeRes = await fetch("/.netlify/functions/transcribe", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ audio: base64, mimeType: "audio/webm" }),
+    });
+    const transcribeData = await transcribeRes.json();
+
+    if (!transcribeRes.ok || !transcribeData.text) {
+      voiceStatus.textContent = "Didn't catch that. Listening again...";
+      if (voiceActive) restartVoiceRecording();
+      return;
+    }
+
+    chatMessages.push({ role: "user", content: transcribeData.text });
+
+    const chatRes = await fetch("/.netlify/functions/chat", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ messages: chatMessages, chatId: currentChatId }),
+    });
+    const chatData = await chatRes.json();
+
+    if (!chatRes.ok) {
+      voiceStatus.textContent = "Error getting response.";
+      if (voiceActive) restartVoiceRecording();
+      return;
+    }
+
+    chatMessages.push({ role: "assistant", content: chatData.reply });
+    voiceStatus.textContent = "Speaking...";
+
+    const speakRes = await fetch("/.netlify/functions/speak", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ text: chatData.reply }),
+    });
+    const speakData = await speakRes.json();
+
+    if (speakRes.ok && speakData.audio) {
+      const audio = new Audio(`data:audio/mp3;base64,${speakData.audio}`);
+      audio.onended = () => {
+        if (voiceActive) restartVoiceRecording();
+      };
+      audio.play();
+    } else if (voiceActive) {
+      restartVoiceRecording();
+    }
+  } catch (err) {
+    console.error("Voice chat error:", err);
+    voiceStatus.textContent = "Something went wrong.";
+    if (voiceActive) restartVoiceRecording();
+  }
+}
+
+function restartVoiceRecording() {
+  voiceStatus.textContent = "Listening...";
+  recordedChunks = [];
+  if (mediaRecorder && mediaRecorder.state === "inactive") {
+    mediaRecorder.start();
+  }
+}
+
+function stopVoiceChat() {
+  voiceActive = false;
+  voiceOverlay.classList.remove("show");
+  if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+  if (mediaRecorder) mediaRecorder.stream.getTracks().forEach(t => t.stop());
+  clearTimeout(silenceTimer);
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ------------------------------------------------------------
+// PDF EXPORT
+// ------------------------------------------------------------
+document.getElementById("export-pdf-btn").onclick = () => {
+  if (chatMessages.length === 0) {
+    alert("No messages to export.");
+    return;
+  }
+
+  const printWindow = window.open("", "_blank");
+  const title = document.getElementById("chat-title").textContent;
+  const bodyHtml = chatMessages
+    .map(m => `<p><strong>${m.role === "user" ? "You" : "Fexer AI"}:</strong> ${escapeHtml(m.content).replace(/\n/g, "<br>")}</p>`)
+    .join("<hr>");
+
+  printWindow.document.write(`
+    <html><head><title>${escapeHtml(title)}</title>
+    <style>body{font-family:sans-serif;padding:30px;line-height:1.6;} hr{border:none;border-top:1px solid #ddd;margin:16px 0;}</style>
+    </head><body><h1>${escapeHtml(title)}</h1>${bodyHtml}</body></html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+};
+
+// ------------------------------------------------------------
+// UPGRADE MODAL
+// ------------------------------------------------------------
+const upgradeModal = document.getElementById("upgrade-modal");
+
+document.getElementById("upgrade-btn").onclick = openUpgradeModal;
+document.getElementById("close-upgrade-modal").onclick = () => upgradeModal.classList.remove("show");
+
+function openUpgradeModal() {
+  upgradeModal.classList.add("show");
+}
+
+document.querySelectorAll(".plan-card-option button[data-plan]").forEach(btn => {
+  btn.onclick = async () => {
+    const plan = btn.dataset.plan;
+    btn.disabled = true;
+    btn.textContent = "Redirecting...";
+
+    try {
+      const res = await fetch("/.netlify/functions/stripe-checkout", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Failed to start checkout.");
+        btn.disabled = false;
+        btn.textContent = `Upgrade to ${plan === "pro" ? "Pro" : "Max"}`;
+      }
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false;
+    }
+  };
+});
+
+document.getElementById("manage-billing-btn").onclick = async () => {
+  try {
+    const res = await fetch("/.netlify/functions/stripe-portal", {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    const data = await res.json();
+
+    if (res.ok && data.url) {
+      window.location.href = data.url;
+    } else {
+      alert(data.error || "No billing account found yet.");
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+// ------------------------------------------------------------
+// AGENT BUILDER
+// ------------------------------------------------------------
+let currentAgentId = null;
+let currentAgentPlan = null;
+
+document.getElementById("new-agent-btn").onclick = () => {
+  showAgentStep("agent-step-prompt");
+  document.getElementById("agent-prompt-input").value = "";
+};
+
+function showAgentStep(stepId) {
+  document.querySelectorAll(".agent-step").forEach(s => s.classList.remove("active"));
+  document.getElementById(stepId).classList.add("active");
+}
+
+document.getElementById("agent-plan-btn").onclick = async () => {
+  const prompt = document.getElementById("agent-prompt-input").value.trim();
+  if (!prompt) return;
+
+  const allowed = await useCredit();
+  if (!allowed) return;
+
+  const btn = document.getElementById("agent-plan-btn");
+  btn.disabled = true;
+  btn.textContent = "Generating plan...";
+
+  try {
+    const res = await fetch("/.netlify/functions/agent-plan", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+
+    btn.disabled = false;
+    btn.textContent = "Generate Plan";
+
+    if (!res.ok) {
+      alert(data.error || "Failed to generate plan.");
+      return;
+    }
+
+    currentAgentId = data.agentId;
+    currentAgentPlan = data.plan;
+    renderAgentPlan(data.plan);
+    showAgentStep("agent-step-plan");
+    loadAgentList();
+  } catch (err) {
+    console.error(err);
+    btn.disabled = false;
+    btn.textContent = "Generate Plan";
+  }
+};
+
+function renderAgentPlan(plan) {
+  document.getElementById("agent-plan-name").textContent = plan.name || "Agent Plan";
+  document.getElementById("agent-plan-desc").textContent = plan.description || "";
+
+  document.getElementById("agent-plan-trigger").innerHTML =
+    `<strong>${escapeHtml(plan.trigger?.type || "manual")}</strong> — ${escapeHtml(plan.trigger?.details || "")}`;
+
+  const stepsContainer = document.getElementById("agent-plan-steps");
+  stepsContainer.innerHTML = "";
+  (plan.steps || []).forEach(step => {
+    const card = document.createElement("div");
+    card.className = "plan-card";
+    card.innerHTML = `<strong>Step ${step.step}</strong> (${escapeHtml(step.service || "")}): ${escapeHtml(step.action || "")}`;
+    stepsContainer.appendChild(card);
+  });
+}
+
+document.getElementById("agent-back-btn").onclick = () => showAgentStep("agent-step-prompt");
+
+document.getElementById("agent-continue-btn").onclick = () => {
+  renderCredentialsForm(currentAgentPlan.required_credentials || []);
+  showAgentStep("agent-step-credentials");
+};
+
+function renderCredentialsForm(credsNeeded) {
+  const container = document.getElementById("agent-credentials-form");
+  container.innerHTML = "";
+
+  if (credsNeeded.length === 0) {
+    container.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;">No external credentials required for this agent.</p>`;
+    return;
+  }
+
+  credsNeeded.forEach(cred => {
+    const field = document.createElement("div");
+    field.className = "credential-field";
+    field.innerHTML = `
+      <label>${escapeHtml(cred.label)} (${escapeHtml(cred.service)})</label>
+      <input type="password" data-key="${escapeHtml(cred.key)}" placeholder="Enter ${escapeHtml(cred.label)}">
+    `;
+    container.appendChild(field);
+  });
+}
+
+document.getElementById("agent-deploy-btn").onclick = async () => {
+  const inputs = document.querySelectorAll("#agent-credentials-form input");
+  const credentials = {};
+  inputs.forEach(input => { credentials[input.dataset.key] = input.value; });
+
+  const btn = document.getElementById("agent-deploy-btn");
+  btn.disabled = true;
+  btn.textContent = "Deploying...";
 
   try {
     const res = await fetch("/.netlify/functions/agent-deploy", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: currentPlan.prompt, plan: currentPlan, credentials })
+      headers: authHeaders(),
+      body: JSON.stringify({ agentId: currentAgentId, credentials }),
     });
     const data = await res.json();
 
-    deployAgentBtn.disabled = false;
+    btn.disabled = false;
+    btn.textContent = "Deploy Agent";
 
-    if (!res.ok || !data.success) throw new Error(data.error || "Deploy failed");
-
-    // Save agent locally
-    const agent = {
-      id: "agent_" + Date.now(),
-      name: currentPlan.agentName,
-      description: currentPlan.description,
-      workflowId: data.workflowId,
-      workflowUrl: data.workflowUrl,
-      active: true,
-      createdAt: new Date().toISOString(),
-      prompt: currentPlan.prompt
-    };
-    agents.unshift(agent);
-    saveAgents();
-    currentAgentId = agent.id;
-    renderAgentList();
-    showAgentDashboard(agent);
-
-  } catch (e) {
-    deployAgentBtn.disabled = false;
-    showAgentState("credentials");
-    alert("❌ Deploy failed: " + e.message + "\n\nMake sure N8N_URL and N8N_API_KEY are set in Netlify environment variables.");
-  }
-});
-
-function animateDeploySteps() {
-  const steps = ["dstep-1", "dstep-2", "dstep-3", "dstep-4"];
-  let i = 0;
-  const t = setInterval(() => {
-    if (i > 0) {
-      const prev = document.getElementById(steps[i - 1]);
-      if (prev) prev.querySelector(".dstep-icon").textContent = "✅";
+    if (!res.ok) {
+      alert(data.error || "Deployment failed.");
+      return;
     }
-    if (i < steps.length) {
-      const cur = document.getElementById(steps[i]);
-      if (cur) { cur.querySelector(".dstep-icon").textContent = "⏳"; cur.querySelector(".dstep-icon").classList.remove("pending"); }
-      i++;
-    } else { clearInterval(t); }
-  }, 1200);
-}
 
-// ── Dashboard ──
-function showAgentDashboard(agent) {
-  dashAgentName.textContent = agent.name;
-  dashAgentDesc.textContent = agent.description || agent.prompt || "";
-  dashStatus.textContent = agent.active ? "🟢 Active" : "⚪ Inactive";
-  dashStatus.className = "status-badge " + (agent.active ? "active-badge" : "inactive-badge");
-  dashN8nLink.href = agent.workflowUrl || "#";
-  showAgentState("running");
-  loadExecutions(agent);
-}
+    document.getElementById("agent-dashboard-link").href = data.dashboardUrl;
+    showAgentStep("agent-step-dashboard");
+    loadAgentList();
+  } catch (err) {
+    console.error(err);
+    btn.disabled = false;
+    btn.textContent = "Deploy Agent";
+  }
+};
 
-async function loadExecutions(agent) {
-  if (!agent.workflowId) return;
+document.getElementById("agent-done-btn").onclick = () => {
+  showAgentStep("agent-step-prompt");
+  document.getElementById("agent-prompt-input").value = "";
+};
+
+async function loadAgentList() {
   try {
-    const res = await fetch("/.netlify/functions/agent-status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workflowId: agent.workflowId }) });
-    if (!res.ok) return;
+    const res = await fetch("/.netlify/functions/agent-status", { headers: authHeaders() });
     const data = await res.json();
 
-    const execs = data.executions || [];
-    statTotal.textContent = execs.length;
-    statSuccess.textContent = execs.filter(e => e.status === "success").length;
-    statFailed.textContent = execs.filter(e => e.status === "error").length;
-    statLast.textContent = execs.length ? timeAgo(execs[0].startedAt) : "—";
+    if (!res.ok) return;
 
-    if (!execs.length) { executionsList.innerHTML = `<p class="exec-empty">No executions yet. The agent will run based on its trigger.</p>`; return; }
+    const container = document.getElementById("agent-list");
+    container.innerHTML = "";
 
-    executionsList.innerHTML = execs.map(e => `
-      <div class="exec-row">
-        <div class="exec-status">
-          <div class="exec-dot ${e.status === 'success' ? 'success' : e.status === 'running' ? 'running' : 'error'}"></div>
-          <span class="exec-label">${e.status === 'success' ? '✓ Success' : e.status === 'running' ? '↻ Running' : '✗ Failed'}</span>
-        </div>
-        <span class="exec-time">${timeAgo(e.startedAt)}</span>
-      </div>
-    `).join("");
-
-  } catch (e) { console.error("Status fetch failed:", e); }
+    (data.agents || []).forEach(agent => {
+      const item = document.createElement("div");
+      item.className = "chat-list-item";
+      item.innerHTML = `<span class="title">${escapeHtml(agent.name)}</span><span style="font-size:11px;color:var(--text-secondary);">${escapeHtml(agent.status)}</span>`;
+      item.onclick = () => {
+        if (agent.dashboard_url) {
+          window.open(agent.dashboard_url, "_blank");
+        }
+      };
+      container.appendChild(item);
+    });
+  } catch (err) {
+    console.error("Failed to load agents:", err);
+  }
 }
 
-dashRefreshBtn.addEventListener("click", () => {
-  const agent = agents.find(a => a.id === currentAgentId);
-  if (agent) loadExecutions(agent);
-});
-
-dashDeleteBtn.addEventListener("click", () => {
-  const agent = agents.find(a => a.id === currentAgentId);
-  if (!agent) return;
-  if (!confirm("Delete agent '" + agent.name + "'?")) return;
-  agents = agents.filter(a => a.id !== currentAgentId);
-  saveAgents(); currentAgentId = null; renderAgentList(); showAgentState("welcome");
-});
-
-function timeAgo(dateStr) {
-  if (!dateStr) return "—";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return m + "m ago";
-  const h = Math.floor(m / 60);
-  if (h < 24) return h + "h ago";
-  return Math.floor(h / 24) + "d ago";
-}
-
-
-// ════════════════════════════════════════════
-//  INIT
-// ════════════════════════════════════════════
-loadChats();
-loadSettings();
-loadAgents();
-updateBtn();
-updateHeader();
+// ------------------------------------------------------------
+// STRIPE CHECKOUT SUCCESS/CANCEL HANDLING (from redirect)
+// ------------------------------------------------------------
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("checkout") === "success") {
+    setTimeout(() => {
+      alert("🎉 Upgrade successful! Your new plan is now active.");
+      loadCredits();
+    }, 500);
+  }
+})();

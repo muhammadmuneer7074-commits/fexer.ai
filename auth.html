@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fexer AI - Sign In</title>
+    <link rel="stylesheet" href="auth.css">
+</head>
+
+<body>
+
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <span class="logo-dot"></span> Fexer AI
+            </div>
+
+            <!-- LOGIN FORM -->
+            <form id="login-form" class="auth-form active">
+                <h2>Welcome back</h2>
+                <p class="auth-sub">Sign in to continue to Fexer AI</p>
+
+                <div id="login-error" class="auth-error"></div>
+
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="you@example.com" required>
+
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" required>
+
+                <button type="submit" class="btn-primary" id="login-btn">Sign In</button>
+
+                <div class="auth-links">
+                    <a href="#" id="show-forgot">Forgot password?</a>
+                    <span>·</span>
+                    <a href="#" id="show-signup">Create account</a>
+                </div>
+            </form>
+
+            <!-- SIGNUP FORM -->
+            <form id="signup-form" class="auth-form">
+                <h2>Create your account</h2>
+                <p class="auth-sub">Start building with Fexer AI free</p>
+
+                <div id="signup-error" class="auth-error"></div>
+
+                <label>Full Name</label>
+                <input type="text" id="signup-name" placeholder="Muhammad Muneer" required>
+
+                <label>Email</label>
+                <input type="email" id="signup-email" placeholder="you@example.com" required>
+
+                <label>Password</label>
+                <input type="password" id="signup-password" placeholder="Min. 6 characters" required minlength="6">
+
+                <button type="submit" class="btn-primary" id="signup-btn">Create Account</button>
+
+                <div class="auth-links">
+                    <a href="#" id="show-login-from-signup">Already have an account? Sign in</a>
+                </div>
+            </form>
+
+            <!-- FORGOT PASSWORD FORM -->
+            <form id="forgot-form" class="auth-form">
+                <h2>Reset password</h2>
+                <p class="auth-sub">We'll email you a reset link</p>
+
+                <div id="forgot-error" class="auth-error"></div>
+                <div id="forgot-success" class="auth-success"></div>
+
+                <label>Email</label>
+                <input type="email" id="forgot-email" placeholder="you@example.com" required>
+
+                <button type="submit" class="btn-primary" id="forgot-btn">Send Reset Link</button>
+
+                <div class="auth-links">
+                    <a href="#" id="show-login-from-forgot">Back to sign in</a>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+</body>
+
+</html>
