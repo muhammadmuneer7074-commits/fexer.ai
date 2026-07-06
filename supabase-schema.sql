@@ -11,8 +11,9 @@ create table if not exists public.profiles (
   email text not null,
   full_name text,
   plan text not null default 'free' check (plan in ('free', 'pro', 'max')),
-  stripe_customer_id text,
-  stripe_subscription_id text,
+  lemonsqueezy_customer_id text,
+  lemonsqueezy_subscription_id text,
+  lemonsqueezy_customer_portal_url text,
   subscription_status text default 'inactive',
   created_at timestamptz default now(),
   updated_at timestamptz default now()

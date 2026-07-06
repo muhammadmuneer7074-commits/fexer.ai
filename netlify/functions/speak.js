@@ -1,49 +1,54 @@
-exports.handler = async function (event) {
-  if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: "Method not allowed" })
-    };
-  }
+// Converts text to speech using OpenAI TTS. Returns base64 audio.
+const { getUserFromRequest } = require("./_supabaseAdmin");
 
-  try {
-    const { text, voice } = JSON.parse(event.body);
-    const apiKey = process.env.OPENAI_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-    const response = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + apiKey
-      },
-      body: JSON.stringify({
-        model: "tts-1",
-        voice: voice || "alloy",
-        input: text,
-        response_format: "mp3"
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return {
-        statusCode: response.status,
-        body: JSON.stringify(errorData)
-      };
+exports.handler = async (event) => {
+    if (event.httpMethod !== "POST") {
+        return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const base64Audio = Buffer.from(arrayBuffer).toString("base64");
+    const { user, error: authError } = await getUserFromRequest(event);
+    if (authError) {
+        return { statusCode: 401, body: JSON.stringify({ error: authError }) };
+    }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ audioBase64: base64Audio })
-    };
+    try {
+        const { text, voice } = JSON.parse(event.body);
 
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Server error: " + error.message })
-    };
-  }
+        if (!text) {
+            return { statusCode: 400, body: JSON.stringify({ error: "text is required" }) };
+        }
+
+        const ttsRes = await fetch("https://api.openai.com/v1/audio/speech", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+                model: "tts-1",
+                voice: voice || "alloy",
+                input: text,
+                response_format: "mp3",
+            }),
+        });
+
+        if (!ttsRes.ok) {
+            const errText = await ttsRes.text();
+            console.error("TTS error:", errText);
+            return { statusCode: 502, body: JSON.stringify({ error: "TTS provider error" }) };
+        }
+
+        const arrayBuffer = await ttsRes.arrayBuffer();
+        const base64Audio = Buffer.from(arrayBuffer).toString("base64");
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ audio: base64Audio, format: "mp3" }),
+        };
+    } catch (err) {
+        console.error("speak.js error:", err);
+        return { statusCode: 500, body: JSON.stringify({ error: "Internal server error" }) };
+    }
 };

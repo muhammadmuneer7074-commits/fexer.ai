@@ -2,15 +2,15 @@
 // FEXER AI - MAIN APP LOGIC
 // ============================================================
 
-const SUPABASE_URL = "https://your-project.supabase.co"; // placeholder
-const SUPABASE_ANON_KEY = "placeholder-your-supabase-anon-key"; // placeholder
+const SUPABASE_URL = "https://fiwukodsrhibrbhmoqgp.supabase.co/rest/v1/"; // placeholder
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpd3Vrb2RzcmhpYnJiaG1vcWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODU1MDQsImV4cCI6MjA5ODc2MTUwNH0.elrA9MQLI0bZVi0jF3qsUTdb-n-60v0YzEx5zsv3xoI"; // placeholder
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let currentSession = null;
 let currentChatId = null;
-let chatMessages = []; // { role, content }
+let chatMessages = []; // { role, content, id, createdAt }
 let attachments = []; // { name, type, dataUrl }
 let mediaRecorder = null;
 let recordedChunks = [];
@@ -212,7 +212,7 @@ async function openChat(chatId, title) {
     return;
   }
 
-  chatMessages = messages.map(m => ({ role: m.role, content: m.content }));
+  chatMessages = messages.map(m => ({ role: m.role, content: m.content, id: m.id, createdAt: m.created_at }));
   renderAllMessages();
   loadChatList();
 
@@ -263,37 +263,240 @@ function renderAllMessages() {
     return;
   }
 
-  chatMessages.forEach(msg => appendMessageToDOM(msg.role, msg.content));
+  chatMessages.forEach(msg => appendMessageToDOM(msg.role, msg.content, msg.id, msg.createdAt));
   container.scrollTop = container.scrollHeight;
 }
 
-function appendMessageToDOM(role, content) {
-  const container = document.getElementById("messages");
-  const emptyState = document.getElementById("empty-state");
-  if (emptyState) emptyState.remove();
-
-  const div = document.createElement("div");
-  div.className = `message ${role}`;
-  div.innerHTML = formatMessageContent(content);
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
-  return div;
+function formatTimestamp(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Renders markdown -> HTML (headings, bold, italics, inline code, code blocks, lists, links)
 function formatMessageContent(content) {
-  let html = escapeHtml(content);
-  html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`);
-  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  const codeBlocks = [];
+
+  // Extract fenced code blocks first so their content isn't mangled by other regexes
+  let working = content.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push({ lang: lang || "plaintext", code: code.replace(/\n$/, "") });
+    return `%%CODEBLOCK_${idx}%%`;
+  });
+
+  let html = escapeHtml(working);
+
+  // Headings
+  html = html.replace(/^### (.*$)/gim, "<h4>$1</h4>");
+  html = html.replace(/^## (.*$)/gim, "<h3>$1</h3>");
+  html = html.replace(/^# (.*$)/gim, "<h2>$1</h2>");
+
+  // Bold, italics, inline code
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+  // Links
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  // Unordered lists (simple line-based)
+  html = html.replace(/(^|\n)- (.*)/g, "$1<li>$2</li>");
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match.replace(/\n/g, "")}</ul>`);
+
   html = html.replace(/\n/g, "<br>");
-  return html;
+
+  // Re-insert code blocks as syntax-highlighted <pre><code> with a header/copy button
+  codeBlocks.forEach((block, idx) => {
+    const escapedCode = escapeHtml(block.code);
+    const blockHtml = `
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span>${escapeHtml(block.lang)}</span>
+          <button class="code-copy-btn" data-code-idx="${idx}">Copy</button>
+        </div>
+        <pre><code class="language-${escapeHtml(block.lang)}">${escapedCode}</code></pre>
+      </div>`;
+    html = html.replace(`%%CODEBLOCK_${idx}%%`, blockHtml);
+  });
+
+  return { html, codeBlocks };
 }
 
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+function appendMessageToDOM(role, content, messageId, createdAt) {
+  const container = document.getElementById("messages");
+  const emptyState = document.getElementById("empty-state");
+  if (emptyState) emptyState.remove();
+
+  const wrapper = document.createElement("div");
+  wrapper.className = `message-wrapper ${role}`;
+  wrapper.dataset.messageId = messageId || "";
+  wrapper.dataset.rawContent = content;
+
+  const bubble = document.createElement("div");
+  bubble.className = `message ${role}`;
+  const { html, codeBlocks } = formatMessageContent(content);
+  bubble.innerHTML = html;
+  bubble._codeBlocks = codeBlocks;
+
+  const actionsRow = document.createElement("div");
+  actionsRow.className = "message-actions";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "message-action-btn";
+  copyBtn.textContent = "Copy";
+  copyBtn.onclick = () => copyToClipboard(content, copyBtn);
+  actionsRow.appendChild(copyBtn);
+
+  if (role === "user") {
+    const editBtn = document.createElement("button");
+    editBtn.className = "message-action-btn";
+    editBtn.textContent = "Edit";
+    editBtn.onclick = () => enterEditMode(wrapper, bubble, content, messageId);
+    actionsRow.appendChild(editBtn);
+  }
+
+  if (role === "assistant") {
+    const regenBtn = document.createElement("button");
+    regenBtn.className = "message-action-btn";
+    regenBtn.textContent = "↻ Regenerate";
+    regenBtn.onclick = () => regenerateResponse(wrapper);
+    actionsRow.appendChild(regenBtn);
+  }
+
+  const timestamp = document.createElement("div");
+  timestamp.className = "message-timestamp";
+  timestamp.textContent = formatTimestamp(createdAt);
+
+  wrapper.appendChild(bubble);
+  wrapper.appendChild(actionsRow);
+  if (createdAt) wrapper.appendChild(timestamp);
+
+  container.appendChild(wrapper);
+  container.scrollTop = container.scrollHeight;
+
+  highlightCodeBlocks(bubble);
+  wireCodeCopyButtons(bubble, codeBlocks);
+
+  return wrapper;
+}
+
+function highlightCodeBlocks(bubble) {
+  if (!window.hljs) return;
+  bubble.querySelectorAll("pre code").forEach(block => {
+    try { window.hljs.highlightElement(block); } catch (e) { /* ignore unknown language */ }
+  });
+}
+
+function wireCodeCopyButtons(bubble, codeBlocks) {
+  bubble.querySelectorAll(".code-copy-btn").forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.codeIdx, 10);
+      const code = codeBlocks[idx]?.code || "";
+      copyToClipboard(code, btn, "Copy");
+    };
+  });
+}
+
+function copyToClipboard(text, btn, resetLabel) {
+  navigator.clipboard.writeText(text).then(() => {
+    const original = resetLabel || btn.textContent;
+    btn.textContent = "Copied!";
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove("copied");
+    }, 1500);
+  }).catch(() => {
+    alert("Couldn't copy — please copy manually.");
+  });
+}
+
+// ------------------------------------------------------------
+// EDIT MESSAGE
+// ------------------------------------------------------------
+function enterEditMode(wrapper, bubble, originalContent, messageId) {
+  const textarea = document.createElement("textarea");
+  textarea.className = "message-edit-textarea";
+  textarea.value = originalContent;
+  textarea.rows = Math.min(8, Math.max(2, originalContent.split("\n").length));
+
+  const actions = document.createElement("div");
+  actions.className = "message-edit-actions";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "message-edit-save";
+  saveBtn.textContent = "Save & Submit";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "message-edit-cancel";
+  cancelBtn.textContent = "Cancel";
+
+  actions.appendChild(saveBtn);
+  actions.appendChild(cancelBtn);
+
+  const existingActionsRow = wrapper.querySelector(".message-actions");
+  bubble.style.display = "none";
+  wrapper.insertBefore(textarea, bubble);
+  wrapper.insertBefore(actions, existingActionsRow);
+
+  textarea.focus();
+
+  cancelBtn.onclick = () => {
+    textarea.remove();
+    actions.remove();
+    bubble.style.display = "";
+  };
+
+  saveBtn.onclick = async () => {
+    const newText = textarea.value.trim();
+    if (!newText) return;
+
+    const msgIndex = chatMessages.findIndex(m => m.id === messageId);
+    const truncateAt = msgIndex >= 0 ? msgIndex : chatMessages.length - 1;
+    chatMessages = chatMessages.slice(0, truncateAt);
+
+    let node = wrapper;
+    const toRemove = [];
+    while (node) {
+      toRemove.push(node);
+      node = node.nextElementSibling;
+    }
+    toRemove.forEach(n => n.remove());
+
+    await sendMessage(newText, messageId);
+  };
+}
+
+// ------------------------------------------------------------
+// REGENERATE RESPONSE
+// ------------------------------------------------------------
+async function regenerateResponse(assistantWrapper) {
+  const assistantMessageId = assistantWrapper.dataset.messageId;
+
+  const msgIndex = chatMessages.findIndex(m => m.id === assistantMessageId);
+  if (msgIndex < 1) return;
+
+  const userMsg = chatMessages[msgIndex - 1];
+  chatMessages = chatMessages.slice(0, msgIndex - 1);
+
+  const userWrapper = document.querySelector(`[data-message-id="${userMsg.id}"]`) ||
+    assistantWrapper.previousElementSibling;
+
+  let node = userWrapper;
+  const toRemove = [];
+  while (node) {
+    toRemove.push(node);
+    node = node.nextElementSibling;
+  }
+  toRemove.forEach(n => n.remove());
+
+  await sendMessage(userMsg.content, userMsg.id);
 }
 
 // ------------------------------------------------------------
@@ -314,7 +517,7 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-sendBtn.onclick = sendMessage;
+sendBtn.onclick = () => sendMessage();
 
 let webSearchEnabled = false;
 document.getElementById("websearch-toggle").onclick = () => {
@@ -322,13 +525,16 @@ document.getElementById("websearch-toggle").onclick = () => {
   document.getElementById("websearch-toggle").classList.toggle("active", webSearchEnabled);
 };
 
-async function sendMessage() {
-  const text = chatInput.value.trim();
+// overrideText/replaceFromMessageId are used for Edit and Regenerate flows.
+// When absent, the function reads from the input box as usual (normal send).
+async function sendMessage(overrideText, replaceFromMessageId) {
+  const text = overrideText !== undefined ? overrideText : chatInput.value.trim();
   if (!text && attachments.length === 0) return;
 
   const allowed = await useCredit();
   if (!allowed) return;
 
+  // Ensure a chat exists (create on first real message = "ghost chat" becomes real)
   if (!currentChatId) {
     const { data: newChat, error } = await supabase
       .from("chats")
@@ -347,14 +553,17 @@ async function sendMessage() {
 
   const userContent = text;
   chatMessages.push({ role: "user", content: userContent });
-  appendMessageToDOM("user", userContent);
+  appendMessageToDOM("user", userContent, null, new Date().toISOString());
 
-  chatInput.value = "";
-  chatInput.style.height = "auto";
+  if (overrideText === undefined) {
+    chatInput.value = "";
+    chatInput.style.height = "auto";
+  }
   const sentAttachments = [...attachments];
   attachments = [];
   renderAttachmentPreview();
 
+  // Loading indicator (AI thinking)
   const loadingDiv = document.createElement("div");
   loadingDiv.className = "message assistant message-loading";
   loadingDiv.innerHTML = "<span></span><span></span><span></span>";
@@ -370,6 +579,7 @@ async function sendMessage() {
         chatId: currentChatId,
         webSearch: webSearchEnabled,
         attachments: sentAttachments,
+        replaceFromMessageId: replaceFromMessageId || undefined,
       }),
     });
 
@@ -381,13 +591,81 @@ async function sendMessage() {
       return;
     }
 
-    chatMessages.push({ role: "assistant", content: data.reply });
-    appendMessageToDOM("assistant", data.reply);
+    // Attach real DB ids to the last pushed messages, if returned
+    if (data.userMessageId) {
+      chatMessages[chatMessages.length - 1].id = data.userMessageId;
+      const userWrapper = document.querySelector(".message-wrapper.user:last-of-type");
+      if (userWrapper) userWrapper.dataset.messageId = data.userMessageId;
+    }
+
+    chatMessages.push({ role: "assistant", content: data.reply, id: data.assistantMessageId });
+    await streamAssistantMessage(data.reply, data.assistantMessageId);
   } catch (err) {
     loadingDiv.remove();
     appendMessageToDOM("assistant", "⚠️ Network error. Please try again.");
     console.error(err);
   }
+}
+
+// Simulated "typing" stream: the full reply already arrived from the API,
+// but we reveal it progressively so it feels like ChatGPT-style streaming.
+async function streamAssistantMessage(fullText, messageId) {
+  const container = document.getElementById("messages");
+  const emptyState = document.getElementById("empty-state");
+  if (emptyState) emptyState.remove();
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "message-wrapper assistant";
+  wrapper.dataset.messageId = messageId || "";
+  wrapper.dataset.rawContent = fullText;
+
+  const bubble = document.createElement("div");
+  bubble.className = "message assistant";
+  bubble.innerHTML = '<span class="streaming-cursor"></span>';
+
+  wrapper.appendChild(bubble);
+  container.appendChild(wrapper);
+  container.scrollTop = container.scrollHeight;
+
+  const chunkSize = 3; // characters per tick — tune for speed
+  let shown = "";
+
+  for (let i = 0; i < fullText.length; i += chunkSize) {
+    shown += fullText.slice(i, i + chunkSize);
+    const { html } = formatMessageContent(shown);
+    bubble.innerHTML = html + '<span class="streaming-cursor"></span>';
+    container.scrollTop = container.scrollHeight;
+    await new Promise(r => setTimeout(r, 12));
+  }
+
+  // Final render with full formatting, actions, timestamp, and highlighting
+  const { html, codeBlocks } = formatMessageContent(fullText);
+  bubble.innerHTML = html;
+
+  const actionsRow = document.createElement("div");
+  actionsRow.className = "message-actions";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "message-action-btn";
+  copyBtn.textContent = "Copy";
+  copyBtn.onclick = () => copyToClipboard(fullText, copyBtn);
+  actionsRow.appendChild(copyBtn);
+
+  const regenBtn = document.createElement("button");
+  regenBtn.className = "message-action-btn";
+  regenBtn.textContent = "↻ Regenerate";
+  regenBtn.onclick = () => regenerateResponse(wrapper);
+  actionsRow.appendChild(regenBtn);
+
+  const timestamp = document.createElement("div");
+  timestamp.className = "message-timestamp";
+  timestamp.textContent = formatTimestamp(new Date().toISOString());
+
+  wrapper.appendChild(actionsRow);
+  wrapper.appendChild(timestamp);
+
+  highlightCodeBlocks(bubble);
+  wireCodeCopyButtons(bubble, codeBlocks);
 }
 
 // ------------------------------------------------------------
@@ -492,6 +770,7 @@ async function startVoiceChat() {
     mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
     mediaRecorder.onstop = handleVoiceRecordingStop;
 
+    // Silence detection via Web Audio API
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const source = audioCtx.createMediaStreamSource(stream);
     const analyser = audioCtx.createAnalyser();
@@ -533,6 +812,7 @@ async function handleVoiceRecordingStop() {
   const base64 = await blobToBase64(blob);
 
   try {
+    // Transcribe
     const transcribeRes = await fetch("/.netlify/functions/transcribe", {
       method: "POST",
       headers: authHeaders(),
@@ -548,6 +828,7 @@ async function handleVoiceRecordingStop() {
 
     chatMessages.push({ role: "user", content: transcribeData.text });
 
+    // Get AI response
     const chatRes = await fetch("/.netlify/functions/chat", {
       method: "POST",
       headers: authHeaders(),
@@ -564,6 +845,7 @@ async function handleVoiceRecordingStop() {
     chatMessages.push({ role: "assistant", content: chatData.reply });
     voiceStatus.textContent = "Speaking...";
 
+    // Speak response
     const speakRes = await fetch("/.netlify/functions/speak", {
       method: "POST",
       headers: authHeaders(),
@@ -656,7 +938,7 @@ document.querySelectorAll(".plan-card-option button[data-plan]").forEach(btn => 
     btn.textContent = "Redirecting...";
 
     try {
-      const res = await fetch("/.netlify/functions/stripe-checkout", {
+      const res = await fetch("/.netlify/functions/lemonsqueezy-checkout", {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({ plan }),
@@ -679,7 +961,7 @@ document.querySelectorAll(".plan-card-option button[data-plan]").forEach(btn => 
 
 document.getElementById("manage-billing-btn").onclick = async () => {
   try {
-    const res = await fetch("/.netlify/functions/stripe-portal", {
+    const res = await fetch("/.netlify/functions/lemonsqueezy-portal", {
       method: "POST",
       headers: authHeaders(),
     });
@@ -861,7 +1143,7 @@ async function loadAgentList() {
 }
 
 // ------------------------------------------------------------
-// STRIPE CHECKOUT SUCCESS/CANCEL HANDLING (from redirect)
+// LEMON SQUEEZY CHECKOUT SUCCESS HANDLING (from redirect)
 // ------------------------------------------------------------
 (() => {
   const params = new URLSearchParams(window.location.search);

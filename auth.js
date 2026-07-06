@@ -2,8 +2,8 @@
 // FEXER AI - AUTH LOGIC
 // ============================================================
 
-const SUPABASE_URL = "https://your-project.supabase.co"; // placeholder
-const SUPABASE_ANON_KEY = "placeholder-your-supabase-anon-key"; // placeholder
+const SUPABASE_URL = "https://fiwukodsrhibrbhmoqgp.supabase.co/rest/v1/"; // placeholder
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpd3Vrb2RzcmhpYnJiaG1vcWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODU1MDQsImV4cCI6MjA5ODc2MTUwNH0.elrA9MQLI0bZVi0jF3qsUTdb-n-60v0YzEx5zsv3xoI"; // placeholder
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -98,7 +98,6 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
         return;
     }
 
-    // If email confirmation is disabled in Supabase, session exists immediately
     if (data.session) {
         window.location.href = "/index.html";
     } else {

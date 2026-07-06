@@ -20,7 +20,6 @@ exports.handler = async (event) => {
         const agentId = event.queryStringParameters?.agentId;
 
         if (!agentId) {
-            // No specific agent requested — return all agents for this user
             const { data: agents, error } = await supabase
                 .from("agents")
                 .select("*")

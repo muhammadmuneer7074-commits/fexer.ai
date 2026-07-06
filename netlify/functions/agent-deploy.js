@@ -4,15 +4,10 @@ const { getUserFromRequest, getSupabaseAdmin } = require("./_supabaseAdmin");
 const N8N_URL = process.env.N8N_URL;
 const N8N_API_KEY = process.env.N8N_API_KEY;
 
-// Builds a minimal n8n workflow JSON from the agent's plan.
-// This is a simplified generic mapping — a Webhook/Manual/Schedule trigger node
-// followed by a chain of "Set" placeholder nodes representing each planned step.
-// You can extend this to map specific services (Gmail, Slack, etc.) to real n8n node types.
 function buildWorkflowFromPlan(plan, agentId) {
     const nodes = [];
     const connections = {};
 
-    // Trigger node
     let triggerNode;
     if (plan.trigger?.type === "webhook") {
         triggerNode = {
@@ -49,7 +44,6 @@ function buildWorkflowFromPlan(plan, agentId) {
     }
     nodes.push(triggerNode);
 
-    // Step nodes (placeholder "Set" nodes that carry the step description forward)
     let prevNodeName = triggerNode.name;
     (plan.steps || []).forEach((step, idx) => {
         const nodeName = `Step ${step.step || idx + 1}: ${step.service || "Action"}`;
@@ -105,7 +99,6 @@ exports.handler = async (event) => {
             return { statusCode: 400, body: JSON.stringify({ error: "agentId is required" }) };
         }
 
-        // Fetch agent + verify ownership
         const { data: agent, error: fetchError } = await supabase
             .from("agents")
             .select("*")
@@ -121,7 +114,6 @@ exports.handler = async (event) => {
 
         const workflow = buildWorkflowFromPlan(agent.plan, agentId);
 
-        // Create workflow in n8n
         const n8nRes = await fetch(`${N8N_URL}/api/v1/workflows`, {
             method: "POST",
             headers: {
@@ -141,7 +133,6 @@ exports.handler = async (event) => {
         const n8nData = await n8nRes.json();
         const workflowId = n8nData.id;
 
-        // Activate the workflow
         await fetch(`${N8N_URL}/api/v1/workflows/${workflowId}/activate`, {
             method: "POST",
             headers: { "X-N8N-API-KEY": N8N_API_KEY },
