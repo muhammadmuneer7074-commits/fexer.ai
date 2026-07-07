@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'TUMHARA_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'TUMHARA_ANON_KEY';
+const SUPABASE_URL = 'https://fiwukodsrhibrbhmoqgp.supabase.';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..elrA9MQLI0bZVi0jF3qsUTdb-n-60v0YzEx5zsv3xoI';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
