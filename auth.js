@@ -1,4 +1,4 @@
-const SUPABASE_URL = 'https://fiwukodsrhibrbhmoqgp.supabase.co/rest/v1/';
+const SUPABASE_URL = 'https://fiwukodsrhibrbhmoqgp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..elrA9MQLI0bZVi0jF3qsUTdb-n-60v0YzEx5zsv3xoI';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
