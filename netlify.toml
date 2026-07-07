@@ -1,21 +1,2 @@
-[build]
-  functions = "netlify/functions"
-  publish = "."
-
 [functions]
-  node_bundler = "esbuild"
-  included_files = ["netlify/functions/**"]
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  conditions = {Role = ["admin"]}
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(self), geolocation=()"
+  external_node_modules = ["@supabase/supabase-js", "ws"]
