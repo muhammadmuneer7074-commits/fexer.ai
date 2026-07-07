@@ -1,5 +1,6 @@
 const { resp } = require('./_supabaseAdmin');
 
+const { resp } = require('./_utils');
 exports.handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') return resp(200, {});
     if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
