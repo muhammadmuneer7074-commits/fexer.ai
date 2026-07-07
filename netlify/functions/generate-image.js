@@ -1,55 +1,25 @@
-// Generates an image from a text prompt using OpenAI's image generation API.
-const { getUserFromRequest } = require("./_supabaseAdmin");
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const { verifyUser, checkAndUseCredit, resp } = require('./_supabaseAdmin');
 
 exports.handler = async (event) => {
-    if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
-    }
-
-    const { user, error: authError } = await getUserFromRequest(event);
-    if (authError) {
-        return { statusCode: 401, body: JSON.stringify({ error: authError }) };
-    }
-
+    if (event.httpMethod === 'OPTIONS') return resp(200, {});
+    if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
     try {
-        const { prompt, size } = JSON.parse(event.body);
-
-        if (!prompt) {
-            return { statusCode: 400, body: JSON.stringify({ error: "prompt is required" }) };
+        const user = await verifyUser(event.headers.authorization || event.headers.Authorization);
+        if (user) {
+            const ok = await checkAndUseCredit(user.id, 2, 'image_gen_direct');
+            if (!ok.ok) return resp(402, { error: 'NO_CREDITS', message: 'No credits remaining.' });
         }
 
-        const imgRes = await fetch("https://api.openai.com/v1/images/generations", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-                model: "dall-e-3",
-                prompt,
-                n: 1,
-                size: size || "1024x1024",
-                response_format: "b64_json",
-            }),
+        const { prompt, size = '1024x1024' } = JSON.parse(event.body);
+        if (!prompt?.trim()) return resp(400, { error: 'No prompt provided' });
+
+        const res = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
+            body: JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size, response_format: 'b64_json' })
         });
-
-        if (!imgRes.ok) {
-            const errText = await imgRes.text();
-            console.error("Image gen error:", errText);
-            return { statusCode: 502, body: JSON.stringify({ error: "Image generation provider error" }) };
-        }
-
-        const data = await imgRes.json();
-        const b64 = data.data[0].b64_json;
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ image: `data:image/png;base64,${b64}` }),
-        };
-    } catch (err) {
-        console.error("generate-image.js error:", err);
-        return { statusCode: 500, body: JSON.stringify({ error: "Internal server error" }) };
-    }
+        const data = await res.json();
+        if (!res.ok) return resp(res.status, { error: data.error?.message || 'Generation failed' });
+        return resp(200, { b64: data.data[0].b64_json, revised_prompt: data.data[0].revised_prompt });
+    } catch (e) { return resp(500, { error: e.message }); }
 };

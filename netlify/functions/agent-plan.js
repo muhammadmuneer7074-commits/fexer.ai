@@ -1,87 +1,46 @@
-// Takes a user's natural-language automation idea and turns it into a structured plan
-// (trigger, steps, required credentials) using gpt-4o-mini with JSON output.
-const { getUserFromRequest, getSupabaseAdmin } = require("./_supabaseAdmin");
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-const SYSTEM_PROMPT = `You are an automation planning engine for an AI Agent Builder.
-Given a user's plain-English description of an automation/agent they want, output ONLY valid JSON (no markdown, no preamble) with this exact shape:
-{
-  "name": "short agent name",
-  "description": "one sentence summary",
-  "trigger": { "type": "webhook|schedule|manual", "details": "description of trigger" },
-  "steps": [
-    { "step": 1, "action": "description of what happens", "service": "e.g. Gmail, Slack, OpenAI" }
-  ],
-  "required_credentials": [
-    { "key": "service_api_key", "label": "Human readable label", "service": "e.g. Slack" }
-  ]
-}`;
+const { verifyUser, checkAndUseCredit, resp } = require('./_supabaseAdmin');
 
 exports.handler = async (event) => {
-    if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
-    }
-
-    const { user, error: authError } = await getUserFromRequest(event);
-    if (authError) {
-        return { statusCode: 401, body: JSON.stringify({ error: authError }) };
-    }
-
+    if (event.httpMethod === 'OPTIONS') return resp(200, {});
+    if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
     try {
+        const user = await verifyUser(event.headers.authorization || event.headers.Authorization);
+        if (user) {
+            const ok = await checkAndUseCredit(user.id, 1, 'agent_plan');
+            if (!ok.ok) return resp(402, { error: 'NO_CREDITS', message: 'No credits remaining.' });
+        }
+
         const { prompt } = JSON.parse(event.body);
 
-        if (!prompt) {
-            return { statusCode: 400, body: JSON.stringify({ error: "prompt is required" }) };
-        }
+        const sys = `You are an AI Agent Builder. Respond ONLY with raw valid JSON (no markdown, no code fences).
 
-        const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-                model: "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: SYSTEM_PROMPT },
-                    { role: "user", content: prompt },
-                ],
-                temperature: 0.3,
-                response_format: { type: "json_object" },
-            }),
+{
+  "agentName": "Short name",
+  "description": "1-2 sentence description",
+  "services": [{
+    "name": "Service name",
+    "reason": "Why needed",
+    "credentialType": "api_key or none",
+    "credentialLabel": "Label for user",
+    "credentialKey": "unique_snake_case_key",
+    "getUrl": "URL to get credential"
+  }],
+  "steps": ["Step 1", "Step 2"],
+  "trigger": "manual or schedule or webhook",
+  "n8nNodes": ["node names"]
+}`;
+
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
+            body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 1500, messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }] })
         });
 
-        if (!openaiRes.ok) {
-            const errText = await openaiRes.text();
-            console.error("OpenAI error:", errText);
-            return { statusCode: 502, body: JSON.stringify({ error: "AI provider error" }) };
-        }
+        const data = await res.json();
+        if (!res.ok) return resp(res.status, { error: data.error?.message || 'AI error' });
 
-        const data = await openaiRes.json();
-        const plan = JSON.parse(data.choices[0].message.content);
-
-        const supabase = getSupabaseAdmin();
-        const { data: agent, error: dbError } = await supabase
-            .from("agents")
-            .insert({
-                user_id: user.id,
-                name: plan.name || "Untitled Agent",
-                prompt,
-                plan,
-                status: "planning",
-            })
-            .select()
-            .single();
-
-        if (dbError) throw dbError;
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ agentId: agent.id, plan }),
-        };
-    } catch (err) {
-        console.error("agent-plan.js error:", err);
-        return { statusCode: 500, body: JSON.stringify({ error: "Internal server error" }) };
-    }
+        let raw = data.choices[0].message.content.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const plan = JSON.parse(raw);
+        return resp(200, { plan });
+    } catch (e) { return resp(500, { error: 'Planning failed: ' + e.message }); }
 };

@@ -1,102 +1,72 @@
-// Handles Lemon Squeezy webhook events to keep subscription status in sync with Supabase.
-// IMPORTANT: Configure this endpoint URL in Lemon Squeezy Dashboard -> Settings -> Webhooks:
-// https://fexer.it.com/.netlify/functions/lemonsqueezy-webhook
-// Select events: order_created, subscription_created, subscription_updated, subscription_cancelled, subscription_expired
-const crypto = require("crypto");
-const { getSupabaseAdmin } = require("./_supabaseAdmin");
-
-const WEBHOOK_SECRET = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
-
-const VARIANT_TO_PLAN = {
-    [process.env.LEMONSQUEEZY_PRO_VARIANT_ID]: "pro",
-    [process.env.LEMONSQUEEZY_MAX_VARIANT_ID]: "max",
-};
-
-function verifySignature(rawBody, signature) {
-    const hmac = crypto.createHmac("sha256", WEBHOOK_SECRET);
-    const digest = Buffer.from(hmac.update(rawBody).digest("hex"), "utf8");
-    const sig = Buffer.from(signature || "", "utf8");
-    return digest.length === sig.length && crypto.timingSafeEqual(digest, sig);
-}
+const { resp, sb } = require('./_supabaseAdmin');
+const crypto = require('crypto');
 
 exports.handler = async (event) => {
-    if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: "Method not allowed" };
+    if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
+
+    const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
+    const signature = event.headers['x-signature'];
+    if (secret && signature) {
+        const digest = crypto.createHmac('sha256', secret).update(event.body).digest('hex');
+        if (digest !== signature) return resp(401, { error: 'Invalid signature' });
     }
-
-    const signature = event.headers["x-signature"] || event.headers["X-Signature"];
-    const rawBody = event.body;
-
-    if (!signature || !verifySignature(rawBody, signature)) {
-        console.error("Invalid Lemon Squeezy webhook signature");
-        return { statusCode: 401, body: JSON.stringify({ error: "Invalid signature" }) };
-    }
-
-    const supabase = getSupabaseAdmin();
 
     try {
-        const payload = JSON.parse(rawBody);
+        const payload = JSON.parse(event.body);
         const eventName = payload.meta?.event_name;
-        const customData = payload.meta?.custom_data || {};
-        const attributes = payload.data?.attributes || {};
+        const data = payload.data;
+        const attrs = data?.attributes;
+        const userId = payload.meta?.custom_data?.user_id;
+
+        if (!userId) return resp(200, { received: true });
+
+        const planFromVariant = (vid) => {
+            const v = String(vid);
+            if (v === process.env.LEMONSQUEEZY_PRO_VARIANT_ID) return 'pro';
+            if (v === process.env.LEMONSQUEEZY_MAX_VARIANT_ID) return 'max';
+            return 'free';
+        };
+
+        const dailyFor = (plan) => plan === 'max' ? 999999 : plan === 'pro' ? 100 : 5;
+
+        const updateUser = async (plan, status, subId = null, portalUrl = null, customerId = null) => {
+            const profileUpdate = { plan, lemonsqueezy_subscription_status: status, updated_at: new Date().toISOString() };
+            if (subId) profileUpdate.lemonsqueezy_subscription_id = subId;
+            if (portalUrl) profileUpdate.lemonsqueezy_customer_portal_url = portalUrl;
+            if (customerId) profileUpdate.lemonsqueezy_customer_id = String(customerId);
+            await sb.from('profiles').update(profileUpdate).eq('id', userId);
+
+            const daily = dailyFor(plan);
+            await sb.from('user_credits').update({
+                plan, credits_remaining: daily, credits_daily: daily,
+                last_reset: new Date().toISOString()
+            }).eq('user_id', userId);
+        };
 
         switch (eventName) {
-            case "order_created": {
-                const userId = customData.supabase_user_id;
-                const plan = customData.plan;
-
-                if (userId && plan) {
-                    await supabase
-                        .from("profiles")
-                        .update({
-                            plan,
-                            lemonsqueezy_customer_id: String(attributes.customer_id),
-                            subscription_status: "active",
-                        })
-                        .eq("id", userId);
-                }
+            case 'order_created': {
+                const variantId = attrs?.first_order_item?.variant_id;
+                const plan = planFromVariant(variantId);
+                await updateUser(plan, 'active', null, null, attrs?.customer_id);
                 break;
             }
-
-            case "subscription_created":
-            case "subscription_updated": {
-                const variantId = String(attributes.variant_id);
-                const plan = VARIANT_TO_PLAN[variantId] || "free";
-                const status = attributes.status;
-                const isActive = ["active", "on_trial"].includes(status);
-                const portalUrl = attributes.urls?.customer_portal || null;
-
-                await supabase
-                    .from("profiles")
-                    .update({
-                        plan: isActive ? plan : "free",
-                        subscription_status: status,
-                        lemonsqueezy_subscription_id: String(payload.data.id),
-                        lemonsqueezy_customer_portal_url: portalUrl,
-                    })
-                    .eq("lemonsqueezy_customer_id", String(attributes.customer_id));
+            case 'subscription_created':
+            case 'subscription_updated': {
+                const plan = planFromVariant(attrs?.variant_id);
+                const active = ['active', 'trialing'].includes(attrs?.status);
+                await updateUser(active ? plan : 'free', attrs?.status, String(data?.id), attrs?.urls?.customer_portal, attrs?.customer_id);
                 break;
             }
-
-            case "subscription_cancelled":
-            case "subscription_expired": {
-                await supabase
-                    .from("profiles")
-                    .update({
-                        plan: "free",
-                        subscription_status: eventName === "subscription_expired" ? "expired" : "cancelled",
-                    })
-                    .eq("lemonsqueezy_customer_id", String(attributes.customer_id));
+            case 'subscription_cancelled':
+            case 'subscription_expired': {
+                await updateUser('free', eventName === 'subscription_cancelled' ? 'cancelled' : 'expired');
                 break;
             }
-
-            default:
-                break;
         }
 
-        return { statusCode: 200, body: JSON.stringify({ received: true }) };
-    } catch (err) {
-        console.error("lemonsqueezy-webhook.js error:", err);
-        return { statusCode: 500, body: JSON.stringify({ error: "Webhook handler failed" }) };
+        return resp(200, { received: true });
+    } catch (e) {
+        console.error('Webhook error:', e);
+        return resp(500, { error: e.message });
     }
 };

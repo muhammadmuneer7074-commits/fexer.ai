@@ -1,166 +1,127 @@
--- ============================================================
--- FEXER AI - SUPABASE DATABASE SCHEMA
--- Run this in Supabase SQL Editor (Project > SQL Editor > New Query)
--- ============================================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ------------------------------------------------------------
--- 1. PROFILES TABLE (extends Supabase auth.users)
--- ------------------------------------------------------------
-create table if not exists public.profiles (
-  id uuid references auth.users(id) on delete cascade primary key,
-  email text not null,
-  full_name text,
-  plan text not null default 'free' check (plan in ('free', 'pro', 'max')),
-  lemonsqueezy_customer_id text,
-  lemonsqueezy_subscription_id text,
-  lemonsqueezy_customer_portal_url text,
-  subscription_status text default 'inactive',
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+-- Profiles table
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  avatar_url TEXT,
+  plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro','max')),
+  lemonsqueezy_customer_id TEXT,
+  lemonsqueezy_subscription_id TEXT,
+  lemonsqueezy_subscription_status TEXT,
+  lemonsqueezy_customer_portal_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-alter table public.profiles enable row level security;
-
-create policy "Users can view own profile"
-  on public.profiles for select
-  using (auth.uid() = id);
-
-create policy "Users can update own profile"
-  on public.profiles for update
-  using (auth.uid() = id);
-
--- ------------------------------------------------------------
--- 2. CREDITS TABLE (daily usage tracking)
--- ------------------------------------------------------------
-create table if not exists public.credits (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
-  date date not null default current_date,
-  used integer not null default 0,
-  created_at timestamptz default now(),
-  unique(user_id, date)
+-- Credits table
+CREATE TABLE public.user_credits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE UNIQUE,
+  credits_remaining INTEGER NOT NULL DEFAULT 5,
+  credits_daily INTEGER NOT NULL DEFAULT 5,
+  last_reset TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  plan TEXT NOT NULL DEFAULT 'free',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-alter table public.credits enable row level security;
-
-create policy "Users can view own credits"
-  on public.credits for select
-  using (auth.uid() = user_id);
-
-create policy "Users can insert own credits"
-  on public.credits for insert
-  with check (auth.uid() = user_id);
-
-create policy "Users can update own credits"
-  on public.credits for update
-  using (auth.uid() = user_id);
-
--- ------------------------------------------------------------
--- 3. CHATS TABLE
--- ------------------------------------------------------------
-create table if not exists public.chats (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
-  title text not null default 'New Chat',
-  is_starred boolean default false,
-  is_draft boolean default false,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+-- Chats table
+CREATE TABLE public.chats (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT 'New Chat',
+  starred BOOLEAN NOT NULL DEFAULT FALSE,
+  voice TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-alter table public.chats enable row level security;
-
-create policy "Users can manage own chats"
-  on public.chats for all
-  using (auth.uid() = user_id);
-
--- ------------------------------------------------------------
--- 4. MESSAGES TABLE
--- ------------------------------------------------------------
-create table if not exists public.messages (
-  id uuid default gen_random_uuid() primary key,
-  chat_id uuid references public.chats(id) on delete cascade not null,
-  user_id uuid references auth.users(id) on delete cascade not null,
-  role text not null check (role in ('user', 'assistant', 'system')),
-  content text not null,
-  attachments jsonb default '[]'::jsonb,
-  created_at timestamptz default now()
+-- Messages table
+CREATE TABLE public.messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  chat_id UUID NOT NULL REFERENCES public.chats(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user','assistant')),
+  content JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-alter table public.messages enable row level security;
-
-create policy "Users can manage own messages"
-  on public.messages for all
-  using (auth.uid() = user_id);
-
-create index if not exists messages_chat_id_idx on public.messages(chat_id);
-
--- ------------------------------------------------------------
--- 5. AGENTS TABLE (AI Agent Builder)
--- ------------------------------------------------------------
-create table if not exists public.agents (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
-  name text not null,
-  prompt text not null,
-  plan jsonb,
-  credentials jsonb default '{}'::jsonb,
-  n8n_workflow_id text,
-  status text not null default 'draft' check (status in ('draft', 'planning', 'deploying', 'active', 'failed', 'paused')),
-  dashboard_url text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+-- Agents table
+CREATE TABLE public.agents (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  prompt TEXT,
+  workflow_id TEXT,
+  workflow_url TEXT,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-alter table public.agents enable row level security;
+-- Activity logs
+CREATE TABLE public.activity_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  credits_used INTEGER NOT NULL DEFAULT 0,
+  metadata JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-create policy "Users can manage own agents"
-  on public.agents for all
-  using (auth.uid() = user_id);
+-- RLS
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_credits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 
--- ------------------------------------------------------------
--- 6. AUTO-CREATE PROFILE ON SIGNUP (trigger)
--- ------------------------------------------------------------
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, full_name)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name');
-  return new;
-end;
-$$ language plpgsql security definer;
+CREATE POLICY "own profile" ON public.profiles FOR ALL USING (auth.uid() = id);
+CREATE POLICY "own credits" ON public.user_credits FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "own chats" ON public.chats FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "own messages" ON public.messages FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "own agents" ON public.agents FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "own activity" ON public.activity_logs FOR SELECT USING (auth.uid() = user_id);
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+-- Auto-create profile + credits on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name)
+  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name');
+  INSERT INTO public.user_credits (user_id, credits_remaining, credits_daily, plan)
+  VALUES (NEW.id, 5, 5, 'free');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ------------------------------------------------------------
--- 7. AUTO-UPDATE updated_at TIMESTAMP
--- ------------------------------------------------------------
-create or replace function public.set_updated_at()
-returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$ language plpgsql;
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
-drop trigger if exists set_profiles_updated_at on public.profiles;
-create trigger set_profiles_updated_at
-  before update on public.profiles
-  for each row execute procedure public.set_updated_at();
+-- Auto-update updated_at
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-drop trigger if exists set_chats_updated_at on public.chats;
-create trigger set_chats_updated_at
-  before update on public.chats
-  for each row execute procedure public.set_updated_at();
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE PROCEDURE public.update_updated_at();
+CREATE TRIGGER update_credits_updated_at BEFORE UPDATE ON public.user_credits FOR EACH ROW EXECUTE PROCEDURE public.update_updated_at();
+CREATE TRIGGER update_chats_updated_at BEFORE UPDATE ON public.chats FOR EACH ROW EXECUTE PROCEDURE public.update_updated_at();
+CREATE TRIGGER update_agents_updated_at BEFORE UPDATE ON public.agents FOR EACH ROW EXECUTE PROCEDURE public.update_updated_at();
 
-drop trigger if exists set_agents_updated_at on public.agents;
-create trigger set_agents_updated_at
-  before update on public.agents
-  for each row execute procedure public.set_updated_at();
-
--- ------------------------------------------------------------
--- DONE. Tables created: profiles, credits, chats, messages, agents
--- ------------------------------------------------------------
+-- Indexes
+CREATE INDEX idx_chats_user ON public.chats(user_id);
+CREATE INDEX idx_messages_chat ON public.messages(chat_id);
+CREATE INDEX idx_messages_user ON public.messages(user_id);
+CREATE INDEX idx_agents_user ON public.agents(user_id);
+CREATE INDEX idx_activity_user ON public.activity_logs(user_id);
+CREATE INDEX idx_activity_created ON public.activity_logs(created_at DESC);

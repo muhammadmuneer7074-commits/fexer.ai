@@ -4,85 +4,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fexer AI - Sign In</title>
+    <title>Fexer AI — Sign In</title>
     <link rel="stylesheet" href="auth.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 
 <body>
+    <div class="auth-root">
+        <div class="auth-stars"></div>
 
-    <div class="auth-wrapper">
         <div class="auth-card">
             <div class="auth-logo">
-                <span class="logo-dot"></span> Fexer AI
+                <div class="auth-logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                    </svg>
+                </div>
+                <span>Fexer AI</span>
             </div>
 
-            <!-- LOGIN FORM -->
-            <form id="login-form" class="auth-form active">
-                <h2>Welcome back</h2>
-                <p class="auth-sub">Sign in to continue to Fexer AI</p>
-
-                <div id="login-error" class="auth-error"></div>
-
-                <label>Email</label>
-                <input type="email" id="login-email" placeholder="you@example.com" required>
-
-                <label>Password</label>
-                <input type="password" id="login-password" placeholder="••••••••" required>
-
-                <button type="submit" class="btn-primary" id="login-btn">Sign In</button>
-
-                <div class="auth-links">
-                    <a href="#" id="show-forgot">Forgot password?</a>
-                    <span>·</span>
-                    <a href="#" id="show-signup">Create account</a>
+            <!-- LOGIN -->
+            <div class="auth-panel active" id="panel-login">
+                <h1>Welcome back</h1>
+                <p class="auth-subtitle">Sign in to your account</p>
+                <div class="auth-error" id="loginError"></div>
+                <div class="auth-field">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
                 </div>
-            </form>
-
-            <!-- SIGNUP FORM -->
-            <form id="signup-form" class="auth-form">
-                <h2>Create your account</h2>
-                <p class="auth-sub">Start building with Fexer AI free</p>
-
-                <div id="signup-error" class="auth-error"></div>
-
-                <label>Full Name</label>
-                <input type="text" id="signup-name" placeholder="Muhammad Muneer" required>
-
-                <label>Email</label>
-                <input type="email" id="signup-email" placeholder="you@example.com" required>
-
-                <label>Password</label>
-                <input type="password" id="signup-password" placeholder="Min. 6 characters" required minlength="6">
-
-                <button type="submit" class="btn-primary" id="signup-btn">Create Account</button>
-
-                <div class="auth-links">
-                    <a href="#" id="show-login-from-signup">Already have an account? Sign in</a>
+                <div class="auth-field">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
                 </div>
-            </form>
-
-            <!-- FORGOT PASSWORD FORM -->
-            <form id="forgot-form" class="auth-form">
-                <h2>Reset password</h2>
-                <p class="auth-sub">We'll email you a reset link</p>
-
-                <div id="forgot-error" class="auth-error"></div>
-                <div id="forgot-success" class="auth-success"></div>
-
-                <label>Email</label>
-                <input type="email" id="forgot-email" placeholder="you@example.com" required>
-
-                <button type="submit" class="btn-primary" id="forgot-btn">Send Reset Link</button>
-
-                <div class="auth-links">
-                    <a href="#" id="show-login-from-forgot">Back to sign in</a>
+                <div class="auth-row">
+                    <label class="auth-remember"><input type="checkbox" id="rememberMe"> Remember me</label>
+                    <button class="auth-link" id="toForgot">Forgot password?</button>
                 </div>
-            </form>
+                <button class="auth-btn" id="loginBtn">
+                    <span id="loginBtnText">Sign In</span>
+                    <div class="auth-spinner" id="loginSpinner"></div>
+                </button>
+                <p class="auth-switch">Don't have an account? <button class="auth-link" id="toSignup">Sign up
+                        free</button></p>
+            </div>
 
+            <!-- SIGNUP -->
+            <div class="auth-panel" id="panel-signup">
+                <h1>Create account</h1>
+                <p class="auth-subtitle">Start building AI agents for free</p>
+                <div class="auth-error" id="signupError"></div>
+                <div class="auth-field">
+                    <label>Full Name</label>
+                    <input type="text" id="signupName" placeholder="Muhammad Muneer" autocomplete="name">
+                </div>
+                <div class="auth-field">
+                    <label>Email</label>
+                    <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email">
+                </div>
+                <div class="auth-field">
+                    <label>Password</label>
+                    <input type="password" id="signupPassword" placeholder="Min 8 characters"
+                        autocomplete="new-password">
+                </div>
+                <button class="auth-btn" id="signupBtn">
+                    <span id="signupBtnText">Create Account</span>
+                    <div class="auth-spinner" id="signupSpinner"></div>
+                </button>
+                <div class="auth-plan-info">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Free plan — 5 credits every day, no credit card required
+                </div>
+                <p class="auth-switch">Already have an account? <button class="auth-link" id="toLogin">Sign in</button>
+                </p>
+            </div>
+
+            <!-- FORGOT PASSWORD -->
+            <div class="auth-panel" id="panel-forgot">
+                <h1>Reset password</h1>
+                <p class="auth-subtitle">We'll send you a reset link</p>
+                <div class="auth-error" id="forgotError"></div>
+                <div class="auth-success" id="forgotSuccess"></div>
+                <div class="auth-field">
+                    <label>Email</label>
+                    <input type="email" id="forgotEmail" placeholder="you@example.com">
+                </div>
+                <button class="auth-btn" id="forgotBtn">
+                    <span id="forgotBtnText">Send Reset Link</span>
+                    <div class="auth-spinner" id="forgotSpinner"></div>
+                </button>
+                <p class="auth-switch"><button class="auth-link" id="toLoginFromForgot">← Back to sign in</button></p>
+            </div>
+
+            <!-- EMAIL VERIFY -->
+            <div class="auth-panel" id="panel-verify">
+                <div class="verify-icon">📧</div>
+                <h1>Check your email</h1>
+                <p class="auth-subtitle">We sent a verification link to <strong id="verifyEmail"></strong></p>
+                <p class="auth-subtitle" style="margin-top:8px;">Click the link in the email to verify your account,
+                    then sign in.</p>
+                <button class="auth-btn" style="margin-top:24px;" id="toLoginFromVerify">Back to Sign In</button>
+            </div>
+        </div>
+
+        <div class="auth-footer">
+            <span>© 2026 Fexer AI</span>
         </div>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js"></script>
 </body>
 

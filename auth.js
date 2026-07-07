@@ -1,136 +1,81 @@
-// ============================================================
-// FEXER AI - AUTH LOGIC
-// ============================================================
+const SUPABASE_URL = 'TUMHARA_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'TUMHARA_ANON_KEY';
 
-const SUPABASE_URL = "https://fiwukodsrhibrbhmoqgp.supabase.co/rest/v1/"; // placeholder
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpd3Vrb2RzcmhpYnJiaG1vcWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODU1MDQsImV4cCI6MjA5ODc2MTUwNH0.elrA9MQLI0bZVi0jF3qsUTdb-n-60v0YzEx5zsv3xoI"; // placeholder
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ---------- Form switching ----------
-const forms = {
-    login: document.getElementById("login-form"),
-    signup: document.getElementById("signup-form"),
-    forgot: document.getElementById("forgot-form"),
-};
-
-function showForm(name) {
-    Object.values(forms).forEach(f => f.classList.remove("active"));
-    forms[name].classList.add("active");
+function showPanel(name) {
+    document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
 }
 
-document.getElementById("show-signup").onclick = (e) => { e.preventDefault(); showForm("signup"); };
-document.getElementById("show-forgot").onclick = (e) => { e.preventDefault(); showForm("forgot"); };
-document.getElementById("show-login-from-signup").onclick = (e) => { e.preventDefault(); showForm("login"); };
-document.getElementById("show-login-from-forgot").onclick = (e) => { e.preventDefault(); showForm("login"); };
+function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.classList.add('show'); }
+function hideErr(id) { const el = document.getElementById(id); el.textContent = ''; el.classList.remove('show'); }
 
-function showError(id, message) {
-    const el = document.getElementById(id);
-    el.textContent = message;
-    el.classList.add("show");
+function setLoading(btnId, spinnerId, textId, loading, text) {
+    document.getElementById(btnId).disabled = loading;
+    document.getElementById(spinnerId).classList.toggle('show', loading);
+    if (text) document.getElementById(textId).textContent = text;
 }
 
-function clearError(id) {
-    const el = document.getElementById(id);
-    el.classList.remove("show");
-    el.textContent = "";
-}
-
-// ---------- Check if already logged in ----------
+// Already logged in? Redirect
 (async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
-        window.location.href = "/index.html";
-    }
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) window.location.href = '/';
 })();
 
-// ---------- LOGIN ----------
-document.getElementById("login-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    clearError("login-error");
+// Navigation
+document.getElementById('toSignup').addEventListener('click', () => showPanel('signup'));
+document.getElementById('toLogin').addEventListener('click', () => showPanel('login'));
+document.getElementById('toForgot').addEventListener('click', () => showPanel('forgot'));
+document.getElementById('toLoginFromForgot').addEventListener('click', () => showPanel('login'));
+document.getElementById('toLoginFromVerify').addEventListener('click', () => showPanel('login'));
 
-    const email = document.getElementById("login-email").value.trim();
-    const password = document.getElementById("login-password").value;
-    const btn = document.getElementById("login-btn");
-
-    btn.disabled = true;
-    btn.textContent = "Signing in...";
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    btn.disabled = false;
-    btn.textContent = "Sign In";
-
-    if (error) {
-        showError("login-error", error.message);
-        return;
-    }
-
-    window.location.href = "/index.html";
+// LOGIN
+document.getElementById('loginBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    hideErr('loginError');
+    if (!email || !password) return showErr('loginError', 'Please enter email and password.');
+    setLoading('loginBtn', 'loginSpinner', 'loginBtnText', true, 'Signing in...');
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    setLoading('loginBtn', 'loginSpinner', 'loginBtnText', false, 'Sign In');
+    if (error) return showErr('loginError', error.message);
+    window.location.href = '/';
 });
 
-// ---------- SIGNUP ----------
-document.getElementById("signup-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    clearError("signup-error");
-
-    const name = document.getElementById("signup-name").value.trim();
-    const email = document.getElementById("signup-email").value.trim();
-    const password = document.getElementById("signup-password").value;
-    const btn = document.getElementById("signup-btn");
-
-    btn.disabled = true;
-    btn.textContent = "Creating account...";
-
-    const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-            data: { full_name: name }
-        }
-    });
-
-    btn.disabled = false;
-    btn.textContent = "Create Account";
-
-    if (error) {
-        showError("signup-error", error.message);
-        return;
-    }
-
-    if (data.session) {
-        window.location.href = "/index.html";
-    } else {
-        showError("signup-error", "Account created! Please check your email to confirm, then sign in.");
-        showForm("login");
-    }
+document.getElementById('loginPassword').addEventListener('keypress', e => {
+    if (e.key === 'Enter') document.getElementById('loginBtn').click();
 });
 
-// ---------- FORGOT PASSWORD ----------
-document.getElementById("forgot-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    clearError("forgot-error");
-    document.getElementById("forgot-success").classList.remove("show");
-
-    const email = document.getElementById("forgot-email").value.trim();
-    const btn = document.getElementById("forgot-btn");
-
-    btn.disabled = true;
-    btn.textContent = "Sending...";
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/auth.html",
+// SIGNUP
+document.getElementById('signupBtn').addEventListener('click', async () => {
+    const name = document.getElementById('signupName').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    hideErr('signupError');
+    if (!name) return showErr('signupError', 'Please enter your name.');
+    if (!email) return showErr('signupError', 'Please enter your email.');
+    if (password.length < 8) return showErr('signupError', 'Password must be at least 8 characters.');
+    setLoading('signupBtn', 'signupSpinner', 'signupBtnText', true, 'Creating account...');
+    const { error } = await sb.auth.signUp({
+        email, password,
+        options: { data: { full_name: name }, emailRedirectTo: window.location.origin + '/' }
     });
+    setLoading('signupBtn', 'signupSpinner', 'signupBtnText', false, 'Create Account');
+    if (error) return showErr('signupError', error.message);
+    document.getElementById('verifyEmail').textContent = email;
+    showPanel('verify');
+});
 
-    btn.disabled = false;
-    btn.textContent = "Send Reset Link";
-
-    if (error) {
-        showError("forgot-error", error.message);
-        return;
-    }
-
-    const successEl = document.getElementById("forgot-success");
-    successEl.textContent = "Reset link sent! Check your email.";
-    successEl.classList.add("show");
+// FORGOT PASSWORD
+document.getElementById('forgotBtn').addEventListener('click', async () => {
+    const email = document.getElementById('forgotEmail').value.trim();
+    hideErr('forgotError');
+    document.getElementById('forgotSuccess').classList.remove('show');
+    if (!email) return showErr('forgotError', 'Please enter your email.');
+    setLoading('forgotBtn', 'forgotSpinner', 'forgotBtnText', true, 'Sending...');
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/auth.html' });
+    setLoading('forgotBtn', 'forgotSpinner', 'forgotBtnText', false, 'Send Reset Link');
+    if (error) return showErr('forgotError', error.message);
+    const s = document.getElementById('forgotSuccess'); s.textContent = 'Reset link sent! Check your email.'; s.classList.add('show');
 });

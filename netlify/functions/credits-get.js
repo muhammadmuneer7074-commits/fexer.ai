@@ -1,49 +1,26 @@
-// GET remaining credits for the logged-in user for today.
-const { getSupabaseAdmin, getUserFromRequest, PLAN_LIMITS } = require("./_supabaseAdmin");
+const { verifyUser, resp, sb } = require('./_supabaseAdmin');
 
 exports.handler = async (event) => {
-    if (event.httpMethod !== "GET") {
-        return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
-    }
-
-    const { user, error: authError } = await getUserFromRequest(event);
-    if (authError) {
-        return { statusCode: 401, body: JSON.stringify({ error: authError }) };
-    }
-
-    const supabase = getSupabaseAdmin();
-
+    if (event.httpMethod === 'OPTIONS') return resp(200, {});
+    if (event.httpMethod !== 'GET') return resp(405, { error: 'Method not allowed' });
     try {
-        const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("plan")
-            .eq("id", user.id)
-            .single();
+        const user = await verifyUser(event.headers.authorization || event.headers.Authorization);
+        if (!user) return resp(401, { error: 'Unauthorized' });
 
-        if (profileError) throw profileError;
+        const { data: cred, error } = await sb.from('user_credits').select('*').eq('user_id', user.id).single();
+        if (error || !cred) return resp(404, { error: 'Credits not found' });
 
-        const plan = profile?.plan || "free";
-        const limit = PLAN_LIMITS[plan];
+        const now = new Date();
+        const hoursSince = (now - new Date(cred.last_reset)) / 3600000;
 
-        const today = new Date().toISOString().split("T")[0];
-        const { data: creditRow, error: creditError } = await supabase
-            .from("credits")
-            .select("used")
-            .eq("user_id", user.id)
-            .eq("date", today)
-            .maybeSingle();
+        if (hoursSince >= 24 && cred.plan !== 'max') {
+            const daily = cred.plan === 'pro' ? 100 : 5;
+            const { data: updated } = await sb.from('user_credits')
+                .update({ credits_remaining: daily, credits_daily: daily, last_reset: now.toISOString() })
+                .eq('user_id', user.id).select().single();
+            return resp(200, { credits: updated });
+        }
 
-        if (creditError) throw creditError;
-
-        const used = creditRow?.used || 0;
-        const remaining = limit === Infinity ? "unlimited" : Math.max(limit - used, 0);
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ plan, limit: limit === Infinity ? "unlimited" : limit, used, remaining }),
-        };
-    } catch (err) {
-        console.error("credits-get error:", err);
-        return { statusCode: 500, body: JSON.stringify({ error: "Failed to fetch credits" }) };
-    }
+        return resp(200, { credits: cred });
+    } catch (e) { return resp(500, { error: e.message }); }
 };

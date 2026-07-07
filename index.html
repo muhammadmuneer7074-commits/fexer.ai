@@ -6,220 +6,691 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fexer AI</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 
 <body>
+  <div class="app-root">
 
-  <div class="app">
-
-    <!-- ===================== SIDEBAR ===================== -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-top">
-        <div class="logo"><span class="logo-dot"></span> Fexer AI</div>
-        <button class="icon-btn" id="collapse-sidebar-btn" title="Collapse sidebar">◀</button>
+    <!-- ══ NAV ══ -->
+    <nav class="app-nav">
+      <button id="menuToggle" class="menu-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+      <span class="nav-logo">Fexer AI</span>
+      <div class="nav-right">
+        <div class="nav-credits" id="navCredits">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="6" x2="12" y2="18" />
+            <path d="M15 9.5a3 3 0 0 0-3-1.5h-1a2.5 2.5 0 0 0 0 5h2a2.5 2.5 0 0 1 0 5h-1a3 3 0 0 1-3-1.5" />
+          </svg>
+          <span id="creditsCount">—</span>
+        </div>
+        <div class="nav-plan-badge" id="navPlanBadge">Free</div>
       </div>
+    </nav>
 
-      <button class="new-chat-btn" id="new-chat-btn">+ New Chat</button>
-
-      <div class="sidebar-tabs">
-        <button class="sidebar-tab active" data-tab="chat">Chats</button>
-        <button class="sidebar-tab" data-tab="agents">Agents</button>
-      </div>
-
-      <div class="sidebar-section" id="chat-list-section">
-        <div class="sidebar-label">Starred</div>
-        <div id="starred-chats" class="chat-list"></div>
-        <div class="sidebar-label">Recent</div>
-        <div id="recent-chats" class="chat-list"></div>
-      </div>
-
-      <div class="sidebar-section hidden" id="agent-list-section">
-        <button class="new-chat-btn" id="new-agent-btn">+ New Agent</button>
-        <div id="agent-list" class="chat-list"></div>
-      </div>
-
-      <div class="sidebar-bottom">
-        <div class="credits-widget" id="credits-widget">
-          <div class="credits-label">Credits today</div>
-          <div class="credits-bar">
-            <div class="credits-fill" id="credits-fill"></div>
-          </div>
-          <div class="credits-text" id="credits-text">-- / --</div>
-        </div>
-        <button class="upgrade-btn" id="upgrade-btn">⚡ Upgrade Plan</button>
-        <div class="user-menu" id="user-menu">
-          <div class="user-avatar" id="user-avatar">M</div>
-          <div class="user-email" id="user-email">loading...</div>
-          <button class="icon-btn" id="logout-btn" title="Log out">⏻</button>
-        </div>
-      </div>
-    </aside>
-
-    <!-- ===================== MAIN CONTENT ===================== -->
-    <main class="main">
-
-      <!-- ---------- CHAT TAB ---------- -->
-      <section class="view active" id="chat-view">
-        <header class="topbar">
-          <button class="icon-btn mobile-only" id="open-sidebar-btn">☰</button>
-          <div class="chat-title" id="chat-title">New Chat</div>
-          <div class="topbar-actions">
-            <button class="icon-btn" id="star-chat-btn" title="Star chat">☆</button>
-            <button class="icon-btn" id="export-pdf-btn" title="Export as PDF">⬇</button>
-          </div>
-        </header>
-
-        <div class="messages" id="messages">
-          <div class="empty-state" id="empty-state">
-            <div class="empty-orb"></div>
-            <h2>What can I help with, Muhammad?</h2>
-            <p>Ask anything, generate images, search the web, or talk with voice.</p>
-          </div>
-        </div>
-
-        <div class="input-bar-wrapper">
-          <div class="attachment-preview" id="attachment-preview"></div>
-          <div class="input-bar">
-            <button class="icon-btn" id="attach-btn" title="Attach file">📎</button>
-            <input type="file" id="file-input" hidden multiple>
-            <button class="icon-btn" id="camera-btn" title="Camera">📷</button>
-            <textarea id="chat-input" placeholder="Message Fexer AI..." rows="1"></textarea>
-            <button class="icon-btn toggle-btn" id="websearch-toggle" title="Web search">🌐</button>
-            <button class="icon-btn" id="voice-btn" title="Voice chat">🎙️</button>
-            <button class="send-btn" id="send-btn" title="Send">➤</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- ---------- AGENTS TAB ---------- -->
-      <section class="view" id="agents-view">
-        <header class="topbar">
-          <button class="icon-btn mobile-only" id="open-sidebar-btn-2">☰</button>
-          <div class="chat-title">AI Agent Builder</div>
-        </header>
-
-        <div class="agent-builder" id="agent-builder">
-
-          <!-- Step 1: Prompt -->
-          <div class="agent-step active" id="agent-step-prompt">
-            <h2>Describe the agent you want to build</h2>
-            <p class="agent-sub">Tell Fexer what automation or AI agent you need — in plain English.</p>
-            <textarea id="agent-prompt-input" rows="4"
-              placeholder="e.g. When someone fills my contact form, summarize their message with AI and send it to my Slack channel..."></textarea>
-            <button class="btn-primary" id="agent-plan-btn">Generate Plan</button>
-          </div>
-
-          <!-- Step 2: Plan Review -->
-          <div class="agent-step" id="agent-step-plan">
-            <h2 id="agent-plan-name">Agent Plan</h2>
-            <p class="agent-sub" id="agent-plan-desc"></p>
-
-            <div class="plan-section">
-              <div class="plan-label">Trigger</div>
-              <div id="agent-plan-trigger" class="plan-card"></div>
-            </div>
-
-            <div class="plan-section">
-              <div class="plan-label">Steps</div>
-              <div id="agent-plan-steps" class="plan-card-list"></div>
-            </div>
-
-            <button class="btn-primary" id="agent-continue-btn">Continue to Credentials</button>
-            <button class="btn-secondary" id="agent-back-btn">← Back</button>
-          </div>
-
-          <!-- Step 3: Credentials -->
-          <div class="agent-step" id="agent-step-credentials">
-            <h2>Connect your accounts</h2>
-            <p class="agent-sub">Enter API keys/credentials required for this agent to run.</p>
-            <div id="agent-credentials-form"></div>
-            <button class="btn-primary" id="agent-deploy-btn">Deploy Agent</button>
-          </div>
-
-          <!-- Step 4: Dashboard -->
-          <div class="agent-step" id="agent-step-dashboard">
-            <div class="deploy-success">
-              <div class="success-icon">✓</div>
-              <h2>Agent deployed!</h2>
-              <p>Your agent is live and running.</p>
-              <a href="#" id="agent-dashboard-link" target="_blank" class="btn-primary">Open Dashboard →</a>
-              <button class="btn-secondary" id="agent-done-btn">Back to Agents</button>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-    </main>
-  </div>
-
-  <!-- ===================== UPGRADE MODAL ===================== -->
-  <div class="modal-overlay" id="upgrade-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="close-upgrade-modal">×</button>
-      <h2>Choose your plan</h2>
-      <p class="modal-sub">Upgrade for more credits and unlock the full power of Fexer AI</p>
-
-      <div class="plans-grid">
-        <div class="plan-card-option">
-          <div class="plan-name">Free</div>
-          <div class="plan-price">$0<span>/mo</span></div>
-          <ul class="plan-features">
-            <li>5 credits/day</li>
-            <li>Chat + basic features</li>
-          </ul>
-          <button class="btn-secondary" disabled>Current Plan</button>
-        </div>
-
-        <div class="plan-card-option featured">
-          <div class="plan-badge">Popular</div>
-          <div class="plan-name">Pro</div>
-          <div class="plan-price">$20<span>/mo</span></div>
-          <ul class="plan-features">
-            <li>100 credits/day</li>
-            <li>Voice + Image generation</li>
-            <li>Web search</li>
-            <li>Agent Builder</li>
-          </ul>
-          <button class="btn-primary" data-plan="pro">Upgrade to Pro</button>
-        </div>
-
-        <div class="plan-card-option">
-          <div class="plan-name">Max</div>
-          <div class="plan-price">$75<span>/mo</span></div>
-          <ul class="plan-features">
-            <li>Unlimited credits</li>
-            <li>Priority processing</li>
-            <li>All features unlocked</li>
-          </ul>
-          <button class="btn-primary" data-plan="max">Upgrade to Max</button>
-        </div>
-      </div>
-
-      <button class="btn-secondary" id="manage-billing-btn">Manage existing billing →</button>
+    <!-- ══ NO CREDITS BANNER ══ -->
+    <div class="no-credits-bar" id="noCreditsBar" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <span>You've used all your credits for today.</span>
+      <button id="noCreditsUpgradeBtn">Upgrade</button>
+      <button id="dismissCreditsBar">×</button>
     </div>
-  </div>
 
-  <!-- ===================== VOICE CHAT OVERLAY ===================== -->
-  <div class="voice-overlay" id="voice-overlay">
-    <div class="voice-orb" id="voice-orb"></div>
-    <div class="voice-status" id="voice-status">Listening...</div>
-    <button class="voice-close-btn" id="voice-close-btn">End Voice Chat</button>
-  </div>
+    <!-- ══ MAIN LAYOUT ══ -->
+    <div class="layout">
 
-  <!-- ===================== CAMERA MODAL ===================== -->
-  <div class="modal-overlay" id="camera-modal">
-    <div class="modal-card camera-card">
-      <button class="modal-close" id="close-camera-modal">×</button>
-      <video id="camera-video" autoplay playsinline></video>
-      <canvas id="camera-canvas" hidden></canvas>
-      <button class="btn-primary" id="capture-photo-btn">Capture Photo</button>
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+      <!-- ══ SIDEBAR ══ -->
+      <aside class="sidebar" id="sidebar">
+
+        <div class="sidebar-head">
+          <span class="sidebar-title">Fexer AI</span>
+          <div class="sidebar-head-actions">
+            <div class="sidebar-search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input type="text" id="chatSearchInput" placeholder="Search chats...">
+            </div>
+            <button id="sidebarCloseBtn" class="sb-icon-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button id="sidebarNewChatBtn" class="sb-new-chat-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          New Chat
+        </button>
+
+        <div class="sidebar-body">
+          <!-- Recents -->
+          <div class="sb-section-label">Recents</div>
+          <div class="chat-list" id="chatList"></div>
+
+          <div class="sb-divider"></div>
+
+          <!-- Agents -->
+          <div class="sb-section-row">
+            <span class="sb-section-label">Agents</span>
+            <button id="newAgentBtn" class="sb-icon-btn" title="New Agent">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          </div>
+          <div id="sidebarAgentsList" class="sidebar-agents-list"></div>
+        </div>
+
+        <!-- ══ SIDEBAR BOTTOM ══ -->
+        <div class="sidebar-bottom">
+          <button id="imageGenBtn" class="sb-bottom-icon-btn" title="Generate Image">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </button>
+          <button id="sidebarProfileBtn" class="sb-profile-btn">
+            <div class="sb-avatar" id="sbAvatar">U</div>
+            <span id="sbUserName">Profile</span>
+          </button>
+        </div>
+
+      </aside>
+
+      <!-- ══ CHAT AREA ══ -->
+      <main class="main-chat">
+
+        <div class="chat-header">
+          <h1 id="chatTitle">Fexer AI</h1>
+          <div class="header-right">
+
+            <!-- Ghost button — visible before first message -->
+            <button id="ghostChatBtn" class="ghost-btn" title="Temporary chat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 10h.01M15 10h.01M5 11a7 7 0 0 1 14 0v6.5l-2.5-1.5-2 1.5-2-1.5-2 1.5-2-1.5L5 17.5z" />
+              </svg>
+            </button>
+
+            <!-- Bubble — visible after first message -->
+            <div class="chat-bubble-wrap" id="chatBubbleWrap">
+              <div class="chat-bubble">
+                <button id="chatMenuBtn" class="bubble-btn">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.8" />
+                    <circle cx="12" cy="12" r="1.8" />
+                    <circle cx="12" cy="19" r="1.8" />
+                  </svg>
+                </button>
+                <button id="bubbleNewChatBtn" class="bubble-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              </div>
+              <div class="chat-dropdown" id="chatDropdown">
+                <button id="optStarBtn" class="dropdown-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon
+                      points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                  <span id="starLabel">Star</span>
+                </button>
+                <button id="optRenameBtn" class="dropdown-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Rename
+                </button>
+                <button id="optDeleteBtn" class="dropdown-item danger">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                  </svg>
+                  Delete
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages"></div>
+
+        <div class="chat-input-wrap">
+          <div class="attach-menu" id="attachMenu">
+            <button id="choosePhotoBtn" class="dropdown-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              Photos
+            </button>
+            <button id="takePhotoBtn" class="dropdown-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              Camera
+            </button>
+            <button id="chooseFileBtn" class="dropdown-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              Files
+            </button>
+            <div class="attach-divider"></div>
+            <div class="attach-toggle-row">
+              <span>AI Tools</span>
+              <button id="toolsToggle" class="toggle-switch small-toggle"></button>
+            </div>
+            <div class="attach-toggle-row">
+              <span>Web Search</span>
+              <button id="searchToggle" class="toggle-switch small-toggle"></button>
+            </div>
+          </div>
+
+          <div class="preview-area" id="previewArea"></div>
+
+          <div class="input-row">
+            <button id="attachBtn" class="icon-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <input type="text" id="userInput" placeholder="Message Fexer AI...">
+            <button id="micBtn" class="icon-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            </button>
+            <button id="actionBtn" class="action-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="10" x2="3" y2="14" />
+                <line x1="7" y1="6" x2="7" y2="18" />
+                <line x1="11" y1="3" x2="11" y2="21" />
+                <line x1="15" y1="6" x2="15" y2="18" />
+                <line x1="19" y1="10" x2="19" y2="14" />
+              </svg>
+            </button>
+          </div>
+
+          <input type="file" id="imageInput" accept="image/*,video/*" hidden>
+          <input type="file" id="fileInput" accept=".txt,.md,.csv,.json,.js,.py,.html,.css" hidden>
+        </div>
+
+        <!-- Voice Overlay -->
+        <div class="voice-overlay" id="voiceOverlay">
+          <button id="closeVoiceBtn" class="voice-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <div class="bg-cloud cloud-a"></div>
+          <div class="bg-cloud cloud-b"></div>
+          <div class="bg-cloud cloud-c"></div>
+          <div class="voice-orb" id="voiceOrb">
+            <div class="color-blob"></div>
+          </div>
+          <p class="voice-txt" id="voiceTxt">Listening...</p>
+        </div>
+
+        <!-- Camera Overlay -->
+        <div class="camera-overlay" id="cameraOverlay">
+          <video id="camVideo" autoplay playsinline muted></video>
+          <canvas id="camCanvas" hidden></canvas>
+          <div class="cam-controls">
+            <button id="camCancelBtn" class="cam-side-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <button id="camCaptureBtn" class="cam-capture-btn"></button>
+            <button id="camSwitchBtn" class="cam-side-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6" />
+                <path d="M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+                <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+      </main>
     </div>
-  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- ════════════════════════════
+       AGENT BUILDER PANEL (full screen overlay)
+  ════════════════════════════ -->
+    <div class="agent-panel" id="agentPanel">
+      <div class="agent-panel-nav">
+        <button id="closeAgentPanel" class="sb-icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <h2>AI Agent Builder</h2>
+        <span></span>
+      </div>
+
+      <div class="agents-layout">
+        <div class="agents-sidebar">
+          <div class="agents-sidebar-head">
+            <span>My Agents</span>
+            <button id="newAgentBtnPanel" class="sb-icon-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          </div>
+          <div class="agents-list-panel" id="agentsListPanel">
+            <div class="agents-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+              <p>No agents yet</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="agents-main">
+
+          <!-- Welcome -->
+          <div class="agent-state active" id="state-welcome">
+            <div class="welcome-hero">
+              <div class="welcome-orb">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              </div>
+              <h1>Build AI Agents</h1>
+              <p>Describe your automation. Fexer detects services, asks for credentials, generates the n8n workflow, and
+                deploys it automatically.</p>
+              <div class="example-chips">
+                <button class="ex-chip" data-p="Monitor Gmail for invoices, save to Google Sheets, notify on Slack">📧
+                  Gmail → Sheets → Slack</button>
+                <button class="ex-chip" data-p="Monitor Telegram, summarize with AI, post to Notion daily">📱 Telegram →
+                  AI → Notion</button>
+                <button class="ex-chip" data-p="Scrape product prices hourly, alert Slack if price drops 10%">🛒 Price
+                  Monitor → Alert</button>
+                <button class="ex-chip" data-p="Typeform submission → AI categorize → Notion ticket + Gmail reply">📝
+                  Typeform → AI → Notion</button>
+              </div>
+            </div>
+            <div class="agent-prompt-wrap">
+              <textarea id="agentPromptInput" placeholder="Describe your automation..." rows="3"></textarea>
+              <button id="agentSubmitBtn" class="agent-submit-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                Build Agent
+              </button>
+            </div>
+          </div>
+
+          <!-- Planning -->
+          <div class="agent-state" id="state-planning">
+            <div class="state-header">
+              <div class="state-icon pulse-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg></div>
+              <div>
+                <h2>Analyzing...</h2>
+                <p>Detecting services and creating a plan</p>
+              </div>
+            </div>
+            <div class="plan-steps" id="planningSteps">
+              <div class="plan-step active">
+                <div class="step-dot"></div><span>Understanding your goal</span>
+              </div>
+              <div class="plan-step">
+                <div class="step-dot"></div><span>Detecting required services</span>
+              </div>
+              <div class="plan-step">
+                <div class="step-dot"></div><span>Identifying credentials</span>
+              </div>
+              <div class="plan-step">
+                <div class="step-dot"></div><span>Generating execution plan</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Credentials -->
+          <div class="agent-state" id="state-credentials">
+            <div class="state-header">
+              <div class="state-icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg></div>
+              <div>
+                <h2 id="planName">Agent</h2>
+                <p id="planDesc">Description</p>
+              </div>
+            </div>
+            <div class="plan-grid">
+              <div class="plan-card">
+                <h3>📋 Plan</h3>
+                <ol id="planStepsList" class="plan-ol"></ol>
+              </div>
+              <div class="plan-card">
+                <h3>⚡ Nodes</h3>
+                <div id="planNodeTags" class="plan-tags"></div>
+              </div>
+            </div>
+            <div id="credSection">
+              <h3>🔑 Required Credentials</h3>
+              <p class="hint">Fexer needs these to deploy your agent:</p>
+              <div id="credList" class="cred-list"></div>
+            </div>
+            <div class="cred-actions">
+              <button id="backBtn" class="btn-sec">← Back</button>
+              <button id="deployBtn" class="btn-pri">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                Deploy Agent
+              </button>
+            </div>
+          </div>
+
+          <!-- Deploying -->
+          <div class="agent-state" id="state-deploying">
+            <div class="state-header">
+              <div class="state-icon icon-spin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2">
+                  <line x1="12" y1="2" x2="12" y2="6" />
+                  <line x1="12" y1="18" x2="12" y2="22" />
+                  <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" />
+                  <line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
+                  <line x1="2" y1="12" x2="6" y2="12" />
+                  <line x1="18" y1="12" x2="22" y2="12" />
+                  <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" />
+                  <line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
+                </svg></div>
+              <div>
+                <h2>Deploying...</h2>
+                <p>Generating workflow and deploying to n8n</p>
+              </div>
+            </div>
+            <div class="deploy-steps">
+              <div class="deploy-step" id="ds1">
+                <div class="ds-icon pending">⏳</div><span>Creating n8n credentials</span>
+              </div>
+              <div class="deploy-step" id="ds2">
+                <div class="ds-icon pending">⏳</div><span>Generating workflow with AI</span>
+              </div>
+              <div class="deploy-step" id="ds3">
+                <div class="ds-icon pending">⏳</div><span>Deploying to n8n</span>
+              </div>
+              <div class="deploy-step" id="ds4">
+                <div class="ds-icon pending">⏳</div><span>Activating workflow</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dashboard -->
+          <div class="agent-state" id="state-running">
+            <div class="agent-dash">
+              <div class="dash-header">
+                <div>
+                  <h2 id="dashName">Agent</h2>
+                  <p id="dashDesc">Description</p>
+                </div>
+                <div class="status-badge active-badge" id="dashStatus">🟢 Active</div>
+              </div>
+              <div class="dash-stats">
+                <div class="stat-card"><span class="snum" id="stTotal">0</span><span class="slabel">Total</span></div>
+                <div class="stat-card"><span class="snum green" id="stOk">0</span><span class="slabel">Success</span>
+                </div>
+                <div class="stat-card"><span class="snum red" id="stFail">0</span><span class="slabel">Failed</span>
+                </div>
+                <div class="stat-card"><span class="snum" id="stLast">—</span><span class="slabel">Last Run</span></div>
+              </div>
+              <div class="dash-actions">
+                <a id="dashN8nLink" href="#" target="_blank" class="btn-sec">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  Open n8n
+                </a>
+                <button id="dashRefresh" class="btn-sec">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                  Refresh
+                </button>
+                <button id="dashDelete" class="btn-danger">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  </svg>
+                  Delete
+                </button>
+              </div>
+              <h3 style="font-size:13px;margin-bottom:10px;">Recent Executions</h3>
+              <div id="execList" class="exec-list">
+                <p class="hint">No executions yet.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════
+       IMAGE GENERATION MODAL
+  ════════════════════════════ -->
+    <div class="modal-overlay" id="imageGenModal">
+      <div class="modal-box">
+        <div class="modal-head">
+          <h2>Generate Image</h2>
+          <button id="closeImageGenModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <label class="field-label">Describe your image</label>
+          <textarea id="imgGenPrompt" class="modal-textarea"
+            placeholder="A futuristic city at night with neon lights..." rows="4"></textarea>
+          <div class="size-options">
+            <button class="size-chip selected" data-size="1024x1024">1:1</button>
+            <button class="size-chip" data-size="1792x1024">16:9</button>
+            <button class="size-chip" data-size="1024x1792">9:16</button>
+          </div>
+          <button id="imgGenSubmit" class="agent-submit-btn" style="margin-top:12px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            Generate
+          </button>
+          <div id="imgGenResult" class="img-gen-result"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════
+       PROFILE MODAL (with Subscription)
+  ════════════════════════════ -->
+    <div class="modal-overlay" id="profileModal">
+      <div class="profile-modal">
+        <div class="profile-modal-nav">
+          <div class="profile-nav-tabs">
+            <button class="profile-nav-tab active" data-ptab="profile">Profile</button>
+            <button class="profile-nav-tab" data-ptab="subscription">Subscription</button>
+          </div>
+          <button id="closeProfileModal" class="modal-close">×</button>
+        </div>
+
+        <!-- Profile Tab -->
+        <div class="profile-tab active" id="ptab-profile">
+          <div class="profile-photo-section">
+            <div class="profile-photo" id="profilePhoto">U</div>
+            <button id="changePhotoBtn" class="btn-small">Change Photo</button>
+            <input type="file" id="profilePhotoInput" accept="image/*" hidden>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Full Name</label>
+            <input type="text" id="profileName" class="modal-input" placeholder="Your name">
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Email</label>
+            <input type="text" id="profileEmail" class="modal-input" readonly style="opacity:0.5;">
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Instructions for Fexer AI</label>
+            <p class="hint">Fexer AI keeps these in mind across all chats.</p>
+            <textarea id="profileInstructions" class="modal-textarea" placeholder="e.g. Always reply in Roman Urdu"
+              rows="3"></textarea>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Response Style</label>
+            <div class="chip-row" id="styleChips">
+              <button class="chip" data-style="normal">Normal</button>
+              <button class="chip" data-style="concise">Concise</button>
+              <button class="chip" data-style="friendly">Friendly</button>
+              <button class="chip" data-style="formal">Formal</button>
+              <button class="chip" data-style="creative">Creative</button>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Voice</label>
+            <div class="chip-row" id="voiceChips">
+              <button class="chip" data-voice="auto">Auto</button>
+              <button class="chip" data-voice="alloy">Alloy</button>
+              <button class="chip" data-voice="echo">Echo</button>
+              <button class="chip" data-voice="fable">Fable</button>
+              <button class="chip" data-voice="onyx">Onyx</button>
+              <button class="chip" data-voice="nova">Nova</button>
+              <button class="chip" data-voice="shimmer">Shimmer</button>
+            </div>
+          </div>
+
+          <button id="saveProfileBtn" class="btn-pri" style="width:100%;margin-top:8px;">Save Profile</button>
+
+          <div class="profile-divider"></div>
+
+          <button id="signoutBtn" class="btn-danger" style="width:100%;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign Out
+          </button>
+        </div>
+
+        <!-- Subscription Tab -->
+        <div class="profile-tab" id="ptab-subscription">
+          <div class="current-plan-card" id="currentPlanCard">
+            <div class="cplan-header">
+              <div>
+                <div class="cplan-name" id="cplanName">Free Plan</div>
+                <div class="cplan-credits" id="cplanCredits">5 credits/day</div>
+              </div>
+              <div class="cplan-badge" id="cplanBadge">Free</div>
+            </div>
+          </div>
+
+          <div class="upgrade-plans">
+            <div class="uplan">
+              <div class="uplan-name">Free</div>
+              <div class="uplan-price">$0<span>/mo</span></div>
+              <ul class="uplan-features">
+                <li>✓ 5 credits/day</li>
+                <li>✓ AI Chat</li>
+                <li>✓ AI Agents</li>
+                <li>✓ Web Search</li>
+              </ul>
+              <button class="uplan-btn current-btn" disabled>Current</button>
+            </div>
+            <div class="uplan featured-plan">
+              <div class="featured-badge">Popular</div>
+              <div class="uplan-name">Pro</div>
+              <div class="uplan-price">$20<span>/mo</span></div>
+              <ul class="uplan-features">
+                <li>✓ 100 credits/day</li>
+                <li>✓ Everything in Free</li>
+                <li>✓ AI Image Generation</li>
+                <li>✓ Priority support</li>
+              </ul>
+              <button class="uplan-btn pro-btn" data-plan="pro">Upgrade to Pro</button>
+            </div>
+            <div class="uplan">
+              <div class="featured-badge max-badge">Best Value</div>
+              <div class="uplan-name">Max</div>
+              <div class="uplan-price">$75<span>/mo</span></div>
+              <ul class="uplan-features">
+                <li>✓ Unlimited credits</li>
+                <li>✓ Everything in Pro</li>
+                <li>✓ API Access</li>
+                <li>✓ Early Access</li>
+              </ul>
+              <button class="uplan-btn max-btn" data-plan="max">Get Max</button>
+            </div>
+          </div>
+
+          <button id="billingPortalBtn" class="btn-sec" style="width:100%;margin-top:16px;justify-content:center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="5" width="20" height="14" rx="2" />
+              <line x1="2" y1="10" x2="22" y2="10" />
+            </svg>
+            Manage Billing
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
   <script src="script.js"></script>
 </body>
 

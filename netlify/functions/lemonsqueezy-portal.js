@@ -1,41 +1,28 @@
-// Returns the Lemon Squeezy customer portal URL so users can manage/cancel their subscription.
-// Lemon Squeezy stores this URL directly on the subscription object (no separate session needed).
-const { getUserFromRequest, getSupabaseAdmin } = require("./_supabaseAdmin");
+const { verifyUser, resp, sb } = require('./_supabaseAdmin');
 
 exports.handler = async (event) => {
-    if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
-    }
-
-    const { user, error: authError } = await getUserFromRequest(event);
-    if (authError) {
-        return { statusCode: 401, body: JSON.stringify({ error: authError }) };
-    }
-
-    const supabase = getSupabaseAdmin();
-
+    if (event.httpMethod === 'OPTIONS') return resp(200, {});
+    if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
     try {
-        const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("lemonsqueezy_customer_portal_url")
-            .eq("id", user.id)
-            .single();
+        const user = await verifyUser(event.headers.authorization || event.headers.Authorization);
+        if (!user) return resp(401, { error: 'Unauthorized' });
 
-        if (profileError) throw profileError;
+        const { data: profile } = await sb.from('profiles')
+            .select('lemonsqueezy_customer_id, lemonsqueezy_customer_portal_url, plan')
+            .eq('id', user.id).single();
 
-        if (!profile?.lemonsqueezy_customer_portal_url) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ error: "No billing account found. Please subscribe to a plan first." }),
-            };
-        }
+        if (!profile?.lemonsqueezy_customer_id) return resp(400, { error: 'No subscription found. Please upgrade first.' });
+        if (profile.lemonsqueezy_customer_portal_url) return resp(200, { url: profile.lemonsqueezy_customer_portal_url });
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ url: profile.lemonsqueezy_customer_portal_url }),
-        };
-    } catch (err) {
-        console.error("lemonsqueezy-portal.js error:", err);
-        return { statusCode: 500, body: JSON.stringify({ error: "Failed to fetch billing portal" }) };
-    }
+        const res = await fetch(`https://api.lemonsqueezy.com/v1/customers/${profile.lemonsqueezy_customer_id}`, {
+            headers: { 'Accept': 'application/vnd.api+json', 'Authorization': 'Bearer ' + process.env.LEMONSQUEEZY_API_KEY }
+        });
+        if (!res.ok) return resp(500, { error: 'Could not fetch portal URL' });
+
+        const data = await res.json();
+        const url = data.data?.attributes?.urls?.customer_portal;
+        if (url) await sb.from('profiles').update({ lemonsqueezy_customer_portal_url: url }).eq('id', user.id);
+
+        return resp(200, { url: url || null });
+    } catch (e) { return resp(500, { error: e.message }); }
 };
