@@ -4,14 +4,24 @@ exports.handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') return resp(200, {});
     if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
     try {
-        const user = await verifyUser(event.headers.authorization || event.headers.Authorization);
+        const authHeader = event.headers['authorization'] || event.headers['Authorization'] || '';
+        const user = await verifyUser(authHeader);
         if (!user) return resp(401, { error: 'Unauthorized' });
 
-        const { plan } = JSON.parse(event.body);
-        const variantId = plan === 'pro' ? process.env.LEMONSQUEEZY_PRO_VARIANT_ID : process.env.LEMONSQUEEZY_MAX_VARIANT_ID;
+        const { plan } = JSON.parse(event.body || '{}');
+        if (!plan) return resp(400, { error: 'Plan required' });
+
+        const variantId = plan === 'pro'
+            ? process.env.LEMONSQUEEZY_PRO_VARIANT_ID
+            : process.env.LEMONSQUEEZY_MAX_VARIANT_ID;
+
         if (!variantId) return resp(400, { error: 'Plan variant not configured: ' + plan });
 
-        const { data: profile } = await sb.from('profiles').select('email, full_name').eq('id', user.id).single();
+        const { data: profile } = await sb
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', user.id)
+            .single();
 
         const checkoutData = {
             data: {
@@ -43,7 +53,9 @@ exports.handler = async (event) => {
 
         const data = await res.json();
         if (!res.ok) return resp(500, { error: data.errors?.[0]?.detail || 'Checkout failed' });
-
         return resp(200, { url: data.data?.attributes?.url });
-    } catch (e) { return resp(500, { error: e.message }); }
+    } catch (e) {
+        console.error('lemonsqueezy-checkout.js error:', e);
+        return resp(500, { error: e.message });
+    }
 };

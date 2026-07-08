@@ -6,6 +6,7 @@ exports.handler = async (event) => {
 
     const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
     const signature = event.headers['x-signature'];
+
     if (secret && signature) {
         const digest = crypto.createHmac('sha256', secret).update(event.body).digest('hex');
         if (digest !== signature) return resp(401, { error: 'Invalid signature' });
@@ -26,19 +27,21 @@ exports.handler = async (event) => {
             if (v === process.env.LEMONSQUEEZY_MAX_VARIANT_ID) return 'max';
             return 'free';
         };
-
         const dailyFor = (plan) => plan === 'max' ? 999999 : plan === 'pro' ? 100 : 5;
 
-        const updateUser = async (plan, status, subId = null, portalUrl = null, customerId = null) => {
-            const profileUpdate = { plan, lemonsqueezy_subscription_status: status, updated_at: new Date().toISOString() };
-            if (subId) profileUpdate.lemonsqueezy_subscription_id = subId;
-            if (portalUrl) profileUpdate.lemonsqueezy_customer_portal_url = portalUrl;
-            if (customerId) profileUpdate.lemonsqueezy_customer_id = String(customerId);
+        const updateUser = async (plan, status, extras = {}) => {
+            const profileUpdate = {
+                plan,
+                lemonsqueezy_subscription_status: status,
+                updated_at: new Date().toISOString(),
+                ...extras
+            };
             await sb.from('profiles').update(profileUpdate).eq('id', userId);
-
             const daily = dailyFor(plan);
             await sb.from('user_credits').update({
-                plan, credits_remaining: daily, credits_daily: daily,
+                plan,
+                credits_remaining: daily,
+                credits_daily: daily,
                 last_reset: new Date().toISOString()
             }).eq('user_id', userId);
         };
@@ -46,15 +49,20 @@ exports.handler = async (event) => {
         switch (eventName) {
             case 'order_created': {
                 const variantId = attrs?.first_order_item?.variant_id;
-                const plan = planFromVariant(variantId);
-                await updateUser(plan, 'active', null, null, attrs?.customer_id);
+                await updateUser(planFromVariant(variantId), 'active', {
+                    lemonsqueezy_customer_id: String(attrs?.customer_id || '')
+                });
                 break;
             }
             case 'subscription_created':
             case 'subscription_updated': {
                 const plan = planFromVariant(attrs?.variant_id);
                 const active = ['active', 'trialing'].includes(attrs?.status);
-                await updateUser(active ? plan : 'free', attrs?.status, String(data?.id), attrs?.urls?.customer_portal, attrs?.customer_id);
+                await updateUser(active ? plan : 'free', attrs?.status, {
+                    lemonsqueezy_customer_id: String(attrs?.customer_id || ''),
+                    lemonsqueezy_subscription_id: String(data?.id || ''),
+                    lemonsqueezy_customer_portal_url: attrs?.urls?.customer_portal || null
+                });
                 break;
             }
             case 'subscription_cancelled':
