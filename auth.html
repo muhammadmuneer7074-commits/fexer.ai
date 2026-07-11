@@ -11,106 +11,216 @@
 
 <body>
     <div class="auth-root">
-        <div class="auth-stars"></div>
 
-        <div class="auth-card">
-            <div class="auth-logo">
-                <div class="auth-logo-icon">
+        <div class="auth-left">
+            <div class="auth-brand">
+                <div class="brand-orb">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                     </svg>
                 </div>
-                <span>Fexer AI</span>
+                <h1>Fexer AI</h1>
+                <p>Your intelligent AI assistant for chat, voice, image generation, and workflow automation.</p>
             </div>
-
-            <!-- LOGIN -->
-            <div class="auth-panel active" id="panel-login">
-                <h1>Welcome back</h1>
-                <p class="auth-subtitle">Sign in to your account</p>
-                <div class="auth-error" id="loginError"></div>
-                <div class="auth-field">
-                    <label>Email</label>
-                    <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
+            <div class="auth-features">
+                <div class="feature-item">
+                    <span class="feature-icon">💬</span>
+                    <div>
+                        <strong>AI Chat</strong>
+                        <span>GPT-4o-mini powered conversations</span>
+                    </div>
                 </div>
-                <div class="auth-field">
-                    <label>Password</label>
-                    <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+                <div class="feature-item">
+                    <span class="feature-icon">🎙️</span>
+                    <div>
+                        <strong>Live Voice</strong>
+                        <span>Talk naturally with AI</span>
+                    </div>
                 </div>
-                <div class="auth-row">
-                    <label class="auth-remember"><input type="checkbox" id="rememberMe"> Remember me</label>
-                    <button class="auth-link" id="toForgot">Forgot password?</button>
+                <div class="feature-item">
+                    <span class="feature-icon">🎨</span>
+                    <div>
+                        <strong>Image Generation</strong>
+                        <span>DALL-E 3 powered visuals</span>
+                    </div>
                 </div>
-                <button class="auth-btn" id="loginBtn">
-                    <span id="loginBtnText">Sign In</span>
-                    <div class="auth-spinner" id="loginSpinner"></div>
-                </button>
-                <p class="auth-switch">Don't have an account? <button class="auth-link" id="toSignup">Sign up
-                        free</button></p>
-            </div>
-
-            <!-- SIGNUP -->
-            <div class="auth-panel" id="panel-signup">
-                <h1>Create account</h1>
-                <p class="auth-subtitle">Start building AI agents for free</p>
-                <div class="auth-error" id="signupError"></div>
-                <div class="auth-field">
-                    <label>Full Name</label>
-                    <input type="text" id="signupName" placeholder="Muhammad Muneer" autocomplete="name">
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <div>
+                        <strong>AI Projects</strong>
+                        <span>Build n8n automations with AI</span>
+                    </div>
                 </div>
-                <div class="auth-field">
-                    <label>Email</label>
-                    <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email">
-                </div>
-                <div class="auth-field">
-                    <label>Password</label>
-                    <input type="password" id="signupPassword" placeholder="Min 8 characters"
-                        autocomplete="new-password">
-                </div>
-                <button class="auth-btn" id="signupBtn">
-                    <span id="signupBtnText">Create Account</span>
-                    <div class="auth-spinner" id="signupSpinner"></div>
-                </button>
-                <div class="auth-plan-info">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    Free plan — 5 credits every day, no credit card required
-                </div>
-                <p class="auth-switch">Already have an account? <button class="auth-link" id="toLogin">Sign in</button>
-                </p>
-            </div>
-
-            <!-- FORGOT PASSWORD -->
-            <div class="auth-panel" id="panel-forgot">
-                <h1>Reset password</h1>
-                <p class="auth-subtitle">We'll send you a reset link</p>
-                <div class="auth-error" id="forgotError"></div>
-                <div class="auth-success" id="forgotSuccess"></div>
-                <div class="auth-field">
-                    <label>Email</label>
-                    <input type="email" id="forgotEmail" placeholder="you@example.com">
-                </div>
-                <button class="auth-btn" id="forgotBtn">
-                    <span id="forgotBtnText">Send Reset Link</span>
-                    <div class="auth-spinner" id="forgotSpinner"></div>
-                </button>
-                <p class="auth-switch"><button class="auth-link" id="toLoginFromForgot">← Back to sign in</button></p>
-            </div>
-
-            <!-- EMAIL VERIFY -->
-            <div class="auth-panel" id="panel-verify">
-                <div class="verify-icon">📧</div>
-                <h1>Check your email</h1>
-                <p class="auth-subtitle">We sent a verification link to <strong id="verifyEmail"></strong></p>
-                <p class="auth-subtitle" style="margin-top:8px;">Click the link in the email to verify your account,
-                    then sign in.</p>
-                <button class="auth-btn" style="margin-top:24px;" id="toLoginFromVerify">Back to Sign In</button>
             </div>
         </div>
 
-        <div class="auth-footer">
-            <span>© 2026 Fexer AI</span>
+        <div class="auth-right">
+            <div class="auth-card">
+
+                <!-- Logo on mobile -->
+                <div class="mobile-brand">
+                    <div class="brand-orb small">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                        </svg>
+                    </div>
+                    <span>Fexer AI</span>
+                </div>
+
+                <!-- Error / Success messages -->
+                <div id="authMsg" class="auth-msg" style="display:none"></div>
+
+                <!-- ── LOGIN FORM ── -->
+                <div id="formLogin" class="auth-form active">
+                    <h2>Welcome back</h2>
+                    <p class="form-sub">Sign in to your account</p>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="input-wrap">
+                            <input id="loginPassword" type="password" placeholder="Your password"
+                                autocomplete="current-password">
+                            <button type="button" class="eye-btn" data-target="loginPassword">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="remember-label">
+                            <input type="checkbox" id="rememberMe">
+                            Remember me
+                        </label>
+                        <button type="button" class="link-btn" id="toForgot">Forgot password?</button>
+                    </div>
+
+                    <button id="loginBtn" class="primary-btn">Sign In</button>
+
+                    <div class="auth-divider"><span>or</span></div>
+
+                    <button id="googleBtn" class="google-btn">
+                        <svg viewBox="0 0 24 24" width="18" height="18">
+                            <path fill="#4285F4"
+                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                            <path fill="#34A853"
+                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                            <path fill="#FBBC05"
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                            <path fill="#EA4335"
+                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                        </svg>
+                        Continue with Google
+                    </button>
+
+                    <p class="switch-form">Don't have an account? <button type="button" class="link-btn"
+                            id="toSignup">Sign up</button></p>
+                </div>
+
+                <!-- ── SIGNUP FORM ── -->
+                <div id="formSignup" class="auth-form">
+                    <h2>Create account</h2>
+                    <p class="form-sub">Start for free — no credit card required</p>
+
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input id="signupName" type="text" placeholder="Your full name" autocomplete="name">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input id="signupEmail" type="email" placeholder="you@example.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="input-wrap">
+                            <input id="signupPassword" type="password" placeholder="Min. 8 characters"
+                                autocomplete="new-password">
+                            <button type="button" class="eye-btn" data-target="signupPassword">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="pwStrength" class="pw-strength">
+                            <div class="pw-bar">
+                                <div id="pwFill" class="pw-fill"></div>
+                            </div>
+                            <span id="pwLabel">Enter password</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input id="signupConfirm" type="password" placeholder="Repeat password"
+                            autocomplete="new-password">
+                    </div>
+
+                    <label class="terms-label">
+                        <input type="checkbox" id="termsCheck">
+                        I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#"
+                            target="_blank">Privacy Policy</a>
+                    </label>
+
+                    <button id="signupBtn" class="primary-btn">Create Account</button>
+
+                    <div class="auth-divider"><span>or</span></div>
+
+                    <button id="googleBtnSignup" class="google-btn">
+                        <svg viewBox="0 0 24 24" width="18" height="18">
+                            <path fill="#4285F4"
+                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                            <path fill="#34A853"
+                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                            <path fill="#FBBC05"
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                            <path fill="#EA4335"
+                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                        </svg>
+                        Continue with Google
+                    </button>
+
+                    <p class="switch-form">Already have an account? <button type="button" class="link-btn"
+                            id="toLogin">Sign in</button></p>
+                </div>
+
+                <!-- ── FORGOT PASSWORD FORM ── -->
+                <div id="formForgot" class="auth-form">
+                    <button type="button" class="back-btn" id="backToLogin">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6" />
+                        </svg>
+                        Back to sign in
+                    </button>
+                    <h2>Reset password</h2>
+                    <p class="form-sub">We'll send you a reset link</p>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input id="forgotEmail" type="email" placeholder="you@example.com">
+                    </div>
+
+                    <button id="forgotBtn" class="primary-btn">Send Reset Link</button>
+                </div>
+
+                <!-- ── VERIFY EMAIL ── -->
+                <div id="formVerify" class="auth-form">
+                    <div class="verify-icon">✉️</div>
+                    <h2>Check your email</h2>
+                    <p class="form-sub">We sent a verification link to <strong id="verifyEmail"></strong></p>
+                    <p class="verify-hint">Click the link in the email to verify your account, then come back and sign
+                        in.</p>
+                    <button type="button" class="link-btn" id="backFromVerify">← Back to sign in</button>
+                </div>
+
+            </div>
         </div>
+
     </div>
     <script src="auth.js"></script>
 </body>

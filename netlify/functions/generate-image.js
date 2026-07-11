@@ -4,37 +4,15 @@ exports.handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') return resp(200, {});
     if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
     try {
-        const authHeader = event.headers['authorization'] || event.headers['Authorization'] || '';
-        const user = await verifyUser(authHeader);
-
-        if (user) {
-            const ok = await checkAndUseCredit(user.id, 2, 'image_gen_direct');
-            if (!ok.ok) return resp(402, { error: 'NO_CREDITS', message: 'No credits remaining.' });
-        }
-
+        const user = await verifyUser(event.headers);
+        if (user) { const ok = await checkAndUseCredit(user.id, 2, 'image_gen'); if (!ok.ok) return resp(402, { error: 'NO_CREDITS' }); }
         const { prompt, size = '1024x1024' } = JSON.parse(event.body || '{}');
-        if (!prompt || !prompt.trim()) return resp(400, { error: 'No prompt provided' });
-
-        const apiKey = process.env.OPENAI_API_KEY;
-        if (!apiKey) return resp(500, { error: 'OpenAI API key not configured' });
-
-        const res = await fetch('https://api.openai.com/v1/images/generations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-            body: JSON.stringify({
-                model: 'dall-e-3',
-                prompt,
-                n: 1,
-                size,
-                response_format: 'b64_json'
-            })
-        });
-
+        if (!prompt?.trim()) return resp(400, { error: 'No prompt' });
+        const key = process.env.OPENAI_API_KEY;
+        if (!key) return resp(500, { error: 'OPENAI_API_KEY not set' });
+        const res = await fetch('https://api.openai.com/v1/images/generations', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body: JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size, response_format: 'b64_json' }) });
         const data = await res.json();
-        if (!res.ok) return resp(res.status, { error: data.error?.message || 'Generation failed' });
+        if (!res.ok) return resp(res.status, { error: data.error?.message || 'Failed' });
         return resp(200, { b64: data.data[0].b64_json, revised_prompt: data.data[0].revised_prompt });
-    } catch (e) {
-        console.error('generate-image.js error:', e);
-        return resp(500, { error: e.message });
-    }
+    } catch (e) { return resp(500, { error: e.message }); }
 };

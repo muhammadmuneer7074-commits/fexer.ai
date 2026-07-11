@@ -1,2 +1,15 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  conditions = {Role = ["admin"]}
+
 [functions]
-  external_node_modules = ["@supabase/supabase-js", "ws"]
+  node_bundler = "esbuild"

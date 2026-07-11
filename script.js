@@ -1,243 +1,285 @@
 'use strict';
 
-// ════════════════════════════════════════════
-//  CONFIG
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
+//  CONFIG — replace karo
+// ══════════════════════════════════════
 const SUPABASE_URL = 'https://fiwukodsrhibrbhmoqgp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpd3Vrb2RzcmhpYnJiaG1vcWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODU1MDQsImV4cCI6MjA5ODc2MTUwNH0.elrA9MQLI0bZVi0jF3qsUTdb-n-60v0YzEx5zsv3xoI';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpd3Vrb2RzcmhpYnJiaG1vcWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODU1MDQsImV4cCI6MjA5ODc2MTUwNH0.elrA9MQLI0bZVi0jF3qsUTdb-n-60v0YzEx5zsv3xoI';
 
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
+//  UTILS SE FUNCTIONS
+// ══════════════════════════════════════
+const $ = FexerUtils.$;
+const esc = FexerUtils.esc;
+const timeAgo = FexerUtils.timeAgo;
+const truncate = FexerUtils.truncate;
+const rndVoice = FexerUtils.randomVoice;
+const genId = FexerUtils.genId;
+const Store = FexerUtils.Store;
+const parseMd = FexerUtils.parseMd;
+const stripForTTS = FexerUtils.stripForTTS;
+const blobToBase64 = FexerUtils.blobToBase64;
+const downloadImage = FexerUtils.downloadImage;
+const savePDF = FexerUtils.savePDF;
+const copyText = FexerUtils.copyToClipboard;
+const showToast = FexerUtils.showToast;
+const compressImg = FexerUtils.compressImage;
+const extractFrame = FexerUtils.extractVideoFrame;
+
+// ══════════════════════════════════════
 //  SUPABASE
-// ════════════════════════════════════════════
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ══════════════════════════════════════
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+let SB_USER = null;
+let SB_SESSION = null;
+let USER_PLAN = 'free';
+let USER_CREDITS = 5;
 
-let currentUser = null;
-let currentSession = null;
-let userPlan = 'free';
-let userCredits = 5;
-
-// ════════════════════════════════════════════
-//  HELPERS
-// ════════════════════════════════════════════
-const esc = s => {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-};
-
-const randVoice = () => {
-  const v = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
-  return v[Math.floor(Math.random() * v.length)];
-};
-
-function getAuthHeader() {
-  return currentSession
-    ? { 'Authorization': 'Bearer ' + currentSession.access_token }
-    : {};
-}
-
-function apiFetch(url, opts = {}) {
-  return fetch(url, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeader(),
-      ...(opts.headers || {})
-    }
-  });
-}
-
-function timeAgo(ds) {
-  if (!ds) return '—';
-  const m = Math.floor((Date.now() - new Date(ds)) / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return m + 'm ago';
-  const h = Math.floor(m / 60);
-  if (h < 24) return h + 'h ago';
-  return Math.floor(h / 24) + 'd ago';
-}
-
-const I = {
+// ══════════════════════════════════════
+//  SVG ICONS
+// ══════════════════════════════════════
+const IC = {
   voice: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="10" x2="3" y2="14"/><line x1="7" y1="6" x2="7" y2="18"/><line x1="11" y1="3" x2="11" y2="21"/><line x1="15" y1="6" x2="15" y2="18"/><line x1="19" y1="10" x2="19" y2="14"/></svg>`,
   send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`,
   stop: `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`,
-  pdf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
-  dl: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   copy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  dl: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  pdf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
   trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
   star: `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
   bolt: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`
 };
 
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
+//  AUTH HELPERS
+// ══════════════════════════════════════
+function authHdr() {
+  return SB_SESSION
+    ? { 'Authorization': 'Bearer ' + SB_SESSION.access_token }
+    : {};
+}
+
+async function apiFetch(url, opts = {}) {
+  return fetch(url, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHdr(),
+      ...(opts.headers || {})
+    }
+  });
+}
+
+// ══════════════════════════════════════
 //  AUTH
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = '/auth.html'; return; }
-  currentSession = session;
-  currentUser = session.user;
+  SB_SESSION = session;
+  SB_USER = session.user;
 
   sb.auth.onAuthStateChange((_e, sess) => {
     if (!sess) { window.location.href = '/auth.html'; return; }
-    currentSession = sess;
-    currentUser = sess.user;
+    SB_SESSION = sess;
+    SB_USER = sess.user;
   });
 
   await loadUserData();
 }
 
 async function loadUserData() {
-  if (!currentUser) return;
+  if (!SB_USER) return;
 
-  // Load credits
+  // Credits load
   try {
     const r = await apiFetch('/.netlify/functions/credits-get');
     if (r.ok) {
       const { credits } = await r.json();
-      userPlan = credits.plan || 'free';
-      userCredits = credits.plan === 'max' ? Infinity : (credits.credits_remaining || 0);
+      USER_PLAN = credits.plan || 'free';
+      USER_CREDITS = credits.plan === 'max' ? Infinity : (credits.credits_remaining ?? 0);
       updateCreditsUI();
     }
   } catch (e) { console.error('Credits load failed:', e); }
 
-  // Update sidebar avatar
-  const email = currentUser.email || '';
-  el('sbAvatar').textContent = email.charAt(0).toUpperCase();
-  el('sbUserName').textContent = email.split('@')[0];
-  el('profileEmail').value = email;
+  // Profile UI
+  const email = SB_USER.email || '';
+  const init = email.charAt(0).toUpperCase();
+
+  const sbAv = $('sbAvatar'), sbNm = $('sbName'), pEm = $('profileEmail');
+  if (sbAv) sbAv.textContent = init;
+  if (sbNm) sbNm.textContent = email.split('@')[0];
+  if (pEm) pEm.value = email;
 
   updateCurrentPlanCard();
 
-  // Load saved profile
-  try {
-    const saved = JSON.parse(localStorage.getItem('fexerProfile') || '{}');
-    if (saved.name) {
-      el('profileName').value = saved.name;
-      el('sbUserName').textContent = saved.name;
-    }
-    if (saved.instructions) el('profileInstructions').value = saved.instructions;
-    if (saved.photo) {
-      el('profilePhoto').innerHTML = `<img src="${saved.photo}" alt="">`;
-      el('sbAvatar').innerHTML = `<img src="${saved.photo}" alt="">`;
-    }
-  } catch (e) { }
+  // Saved profile
+  const saved = Store.get('fexerProfile', {});
+  if (saved.name) {
+    const n = $('profileName');
+    if (n) n.value = saved.name;
+    if (sbNm) sbNm.textContent = saved.name;
+  }
+  if (saved.instructions) {
+    const i = $('profileInstructions');
+    if (i) i.value = saved.instructions;
+    SETTINGS.customInstructions = saved.instructions;
+  }
+  if (saved.photo) {
+    const ph = $('profilePhoto'), av = $('sbAvatar');
+    if (ph) ph.innerHTML = `<img src="${saved.photo}" alt="">`;
+    if (av) av.innerHTML = `<img src="${saved.photo}" alt="">`;
+  }
 
-  // Check upgrade redirect
   if (new URLSearchParams(window.location.search).get('upgraded') === '1') {
     window.history.replaceState({}, '', '/');
-    setTimeout(() => alert('🎉 Plan upgraded! Your new credits are now active.'), 600);
+    showToast('🎉 Plan upgraded! Your new credits are now active.', 'success', 5000);
   }
 }
 
-function el(id) { return document.getElementById(id); }
-
 function updateCreditsUI() {
-  const count = el('creditsCount');
-  const wrap = el('navCredits');
-  const sub = el('subCreditsCount');
-  const sbadge = el('subPlanBadge');
+  const display = USER_PLAN === 'max' ? '∞' : String(USER_CREDITS);
+  const cn = $('creditsNum'), pb = $('planBadge');
+  if (cn) cn.textContent = display;
+  if (pb) pb.textContent = USER_PLAN.charAt(0).toUpperCase() + USER_PLAN.slice(1);
 
-  const display = userPlan === 'max' ? '∞' : String(userCredits);
-  if (count) count.textContent = display;
-  if (sub) sub.textContent = display;
-  if (sbadge) sbadge.textContent = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
-
-  if (wrap) wrap.classList.toggle('low', userPlan !== 'max' && userCredits <= 1);
-
-  const bar = el('noCreditsBar');
-  if (bar) bar.style.display = (userCredits <= 0 && userPlan !== 'max') ? 'flex' : 'none';
+  const bar = $('noCreditsBar');
+  if (bar) bar.style.display = (USER_CREDITS <= 0 && USER_PLAN !== 'max') ? 'flex' : 'none';
 }
 
 function updateCurrentPlanCard() {
-  const map = {
-    free: { name: 'Free Plan', creds: '5 credits/day', badge: 'Free' },
-    pro: { name: 'Pro Plan', creds: '100 credits/day', badge: 'Pro' },
-    max: { name: 'Max Plan', creds: 'Unlimited credits', badge: 'Max' }
-  };
-  const p = map[userPlan] || map.free;
-  const n = el('cplanName'), c = el('cplanCredits'), b = el('cplanBadge');
-  if (n) n.textContent = p.name;
-  if (c) c.textContent = p.creds;
-  if (b) { b.textContent = p.badge; b.className = 'cplan-badge ' + userPlan; }
+  const info = FexerUtils.getPlanInfo(USER_PLAN);
+  const n = $('currentPlanName'), c = $('currentPlanCreds'), b = $('currentPlanBadge');
+  if (n) n.textContent = info.name;
+  if (c) c.textContent = info.credits + '/day';
+  if (b) b.textContent = USER_PLAN.charAt(0).toUpperCase() + USER_PLAN.slice(1);
 }
 
 async function useCredit() {
-  if (userPlan === 'max') return true;
-  if (userCredits <= 0) {
-    el('noCreditsBar').style.display = 'flex';
+  if (USER_PLAN === 'max') return true;
+  if (USER_CREDITS <= 0) {
+    const bar = $('noCreditsBar');
+    if (bar) bar.style.display = 'flex';
     return false;
   }
-  userCredits = Math.max(0, userCredits - 1);
+  USER_CREDITS = Math.max(0, USER_CREDITS - 1);
   updateCreditsUI();
   return true;
 }
 
-// ── Sign Out ──
-el('signoutBtn').addEventListener('click', async () => {
-  if (!confirm('Sign out?')) return;
-  await sb.auth.signOut();
-  window.location.href = '/auth.html';
+// No credits bar
+$('noCreditsUpgrade').addEventListener('click', () => {
+  $('noCreditsBar').style.display = 'none';
+  openProfile('plans');
+});
+$('noCreditsClose').addEventListener('click', () => {
+  $('noCreditsBar').style.display = 'none';
 });
 
-// ── No Credits Bar ──
-el('noCreditsUpgradeBtn').addEventListener('click', () => {
-  el('noCreditsBar').style.display = 'none';
-  openProfileModal('subscription');
-});
-el('dismissCreditsBar').addEventListener('click', () => {
-  el('noCreditsBar').style.display = 'none';
+// ══════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════
+let SETTINGS = Store.get('fexerSettings', {
+  toolsEnabled: true,
+  deepSearch: false,
+  deepThinking: false,
+  voice: 'auto',
+  style: 'normal',
+  customInstructions: ''
 });
 
-// ════════════════════════════════════════════
+function saveSettings() { Store.set('fexerSettings', SETTINGS); }
+
+function loadSettings() {
+  const s = Store.get('fexerSettings', {});
+  Object.assign(SETTINGS, s);
+
+  const tg = $('toolsToggle'), sg = $('searchToggle');
+  if (tg) tg.classList.toggle('on', SETTINGS.toolsEnabled);
+  if (sg) sg.classList.toggle('on', SETTINGS.deepSearch);
+
+  document.querySelectorAll('#styleChips .chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.style === (SETTINGS.style || 'normal'))
+  );
+  document.querySelectorAll('#voiceChips .chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.voice === (SETTINGS.voice || 'auto'))
+  );
+  if (SETTINGS.customInstructions) {
+    const i = $('profileInstructions');
+    if (i) i.value = SETTINGS.customInstructions;
+  }
+}
+
+$('toolsToggle').addEventListener('click', () => {
+  SETTINGS.toolsEnabled = !SETTINGS.toolsEnabled;
+  $('toolsToggle').classList.toggle('on', SETTINGS.toolsEnabled);
+  saveSettings();
+});
+$('searchToggle').addEventListener('click', () => {
+  SETTINGS.deepSearch = !SETTINGS.deepSearch;
+  $('searchToggle').classList.toggle('on', SETTINGS.deepSearch);
+  saveSettings();
+});
+
+// ══════════════════════════════════════
+//  SIDEBAR
+// ══════════════════════════════════════
+$('menuBtn').addEventListener('click', () => {
+  $('sidebar').classList.toggle('open');
+  $('sidebarOverlay').classList.toggle('active');
+});
+$('sidebarOverlay').addEventListener('click', closeSidebar);
+$('sidebarClose').addEventListener('click', closeSidebar);
+
+function closeSidebar() {
+  $('sidebar').classList.remove('open');
+  $('sidebarOverlay').classList.remove('active');
+}
+
+$('upgradeBtn').addEventListener('click', () => { closeSidebar(); openProfile('plans'); });
+
+// ══════════════════════════════════════
 //  PROFILE MODAL
-// ════════════════════════════════════════════
-function openProfileModal(tab) {
-  el('profileModal').classList.add('show');
-  switchProfileTab(tab || 'profile');
-  // Update credits in subscription tab every time
+// ══════════════════════════════════════
+function openProfile(tab = 'profile') {
+  $('profileModal').classList.add('open');
+  switchProfileTab(tab);
   updateCreditsUI();
 }
 
-el('sidebarProfileBtn').addEventListener('click', () => openProfileModal('profile'));
-el('closeProfileModal').addEventListener('click', () => el('profileModal').classList.remove('show'));
-el('profileModal').addEventListener('click', function (e) {
-  if (e.target === this) this.classList.remove('show');
-});
-
-// Upgrade quick button in sidebar header
-el('upgradeQuickBtn').addEventListener('click', () => {
-  closeSidebar();
-  openProfileModal('subscription');
+$('profileBtn').addEventListener('click', () => openProfile('profile'));
+$('closeProfileBtn').addEventListener('click', () => $('profileModal').classList.remove('open'));
+$('profileModal').addEventListener('click', function (e) {
+  if (e.target === this) this.classList.remove('open');
 });
 
 function switchProfileTab(name) {
-  document.querySelectorAll('.profile-nav-tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.ptab === name);
-  });
-  document.querySelectorAll('.profile-tab').forEach(p => {
-    p.classList.toggle('active', p.id === 'ptab-' + name);
-  });
+  document.querySelectorAll('.profile-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === name)
+  );
+  document.querySelectorAll('.profile-tab-content').forEach(p =>
+    p.classList.toggle('active', p.id === 'ptab-' + name)
+  );
 }
-
-document.querySelectorAll('.profile-nav-tab').forEach(tab => {
-  tab.addEventListener('click', () => switchProfileTab(tab.dataset.ptab));
-});
+document.querySelectorAll('.profile-tab').forEach(t =>
+  t.addEventListener('click', () => switchProfileTab(t.dataset.tab))
+);
 
 // Profile photo
-el('changePhotoBtn').addEventListener('click', () => el('profilePhotoInput').click());
-el('profilePhotoInput').addEventListener('change', function (e) {
+$('changePhotoBtn').addEventListener('click', () => $('photoInputProfile').click());
+$('photoInputProfile').addEventListener('change', function (e) {
   const f = e.target.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = ev => {
+  const reader = new FileReader();
+  reader.onload = ev => {
     const b64 = ev.target.result;
-    el('profilePhoto').innerHTML = `<img src="${b64}" alt="">`;
-    el('sbAvatar').innerHTML = `<img src="${b64}" alt="">`;
-    const s = JSON.parse(localStorage.getItem('fexerProfile') || '{}');
-    s.photo = b64;
-    localStorage.setItem('fexerProfile', JSON.stringify(s));
+    const ph = $('profilePhoto'), av = $('sbAvatar');
+    if (ph) ph.innerHTML = `<img src="${b64}" alt="">`;
+    if (av) av.innerHTML = `<img src="${b64}" alt="">`;
+    const saved = Store.get('fexerProfile', {});
+    saved.photo = b64;
+    Store.set('fexerProfile', saved);
   };
-  r.readAsDataURL(f);
+  reader.readAsDataURL(f);
   e.target.value = '';
 });
 
@@ -246,7 +288,7 @@ document.querySelectorAll('#styleChips .chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('#styleChips .chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
-    appSettings.style = chip.dataset.style;
+    SETTINGS.style = chip.dataset.style;
     saveSettings();
   });
 });
@@ -256,30 +298,32 @@ document.querySelectorAll('#voiceChips .chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('#voiceChips .chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
-    appSettings.voice = chip.dataset.voice;
+    SETTINGS.voice = chip.dataset.voice;
     saveSettings();
   });
 });
 
 // Save profile
-el('saveProfileBtn').addEventListener('click', () => {
-  const name = (el('profileName').value || '').trim();
-  const inst = (el('profileInstructions').value || '').trim();
-  const s = JSON.parse(localStorage.getItem('fexerProfile') || '{}');
-  s.name = name; s.instructions = inst;
-  localStorage.setItem('fexerProfile', JSON.stringify(s));
-  appSettings.customInstructions = inst;
+$('saveProfileBtn').addEventListener('click', () => {
+  const name = ($('profileName')?.value || '').trim();
+  const inst = ($('profileInstructions')?.value || '').trim();
+  const saved = Store.get('fexerProfile', {});
+  saved.name = name; saved.instructions = inst;
+  Store.set('fexerProfile', saved);
+  SETTINGS.customInstructions = inst;
   saveSettings();
-  if (name) el('sbUserName').textContent = name;
-  const btn = el('saveProfileBtn');
-  const orig = btn.textContent;
-  btn.textContent = '✓ Saved!';
-  setTimeout(() => btn.textContent = orig, 1500);
+  if (name && $('sbName')) $('sbName').textContent = name;
+  showToast('✓ Profile saved!', 'success');
 });
 
-// ════════════════════════════════════════════
-//  SUBSCRIPTION
-// ════════════════════════════════════════════
+// Sign out
+$('signOutBtn').addEventListener('click', async () => {
+  if (!confirm('Sign out?')) return;
+  await sb.auth.signOut();
+  window.location.href = '/auth.html';
+});
+
+// ── Subscription ──
 document.querySelectorAll('[data-plan]').forEach(btn => {
   btn.addEventListener('click', async () => {
     const plan = btn.dataset.plan; if (!plan) return;
@@ -292,71 +336,70 @@ document.querySelectorAll('[data-plan]').forEach(btn => {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Checkout failed');
       if (data.url) window.location.href = data.url;
-      else throw new Error('No checkout URL');
+      else throw new Error('No checkout URL returned');
     } catch (e) {
-      alert('❌ ' + e.message);
+      showToast('❌ ' + e.message, 'error');
       btn.disabled = false; btn.textContent = orig;
     }
   });
 });
 
-el('billingPortalBtn').addEventListener('click', async () => {
-  const btn = el('billingPortalBtn');
+$('billingPortalBtn').addEventListener('click', async () => {
+  const btn = $('billingPortalBtn');
   const orig = btn.innerHTML;
   btn.disabled = true; btn.textContent = 'Loading...';
   try {
-    const r = await apiFetch('/.netlify/functions/lemonsqueezy-portal', { method: 'POST', body: JSON.stringify({}) });
+    const r = await apiFetch('/.netlify/functions/lemonsqueezy-portal', {
+      method: 'POST', body: '{}'
+    });
     const data = await r.json();
     if (data.url) window.open(data.url, '_blank');
-    else alert(data.error || 'No billing portal. Subscribe first.');
-  } catch (e) { alert('❌ ' + e.message); }
+    else showToast(data.error || 'No portal found. Subscribe first.', 'error');
+  } catch (e) { showToast('❌ ' + e.message, 'error'); }
   btn.disabled = false; btn.innerHTML = orig;
 });
 
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 //  IMAGE GENERATION MODAL
-// ════════════════════════════════════════════
-function openImageGenModal() {
-  el('imageGenModal').classList.add('show');
-  el('imgGenPrompt').value = '';
-  el('imgGenResult').innerHTML = '';
-  document.querySelector('.size-chip.selected')?.classList.remove('selected');
-  document.querySelector('.size-chip')?.classList.add('selected');
+// ══════════════════════════════════════
+function openImageGen() {
+  $('imageGenModal').classList.add('open');
+  const p = $('imagePrompt'); if (p) p.value = '';
+  const r = $('imageResult'); if (r) r.innerHTML = '';
+  document.querySelectorAll('.size-chip').forEach((c, i) =>
+    c.classList.toggle('active', i === 0)
+  );
 }
 
-// Open from attach menu
-el('attachImageGenBtn').addEventListener('click', () => {
-  el('attachMenu').classList.remove('show');
-  openImageGenModal();
+$('imageGenMenuBtn').addEventListener('click', () => {
+  $('attachMenu').classList.remove('open');
+  openImageGen();
+});
+$('closeImageGenBtn').addEventListener('click', () => $('imageGenModal').classList.remove('open'));
+$('imageGenModal').addEventListener('click', function (e) {
+  if (e.target === this) this.classList.remove('open');
 });
 
-el('closeImageGenModal').addEventListener('click', () => el('imageGenModal').classList.remove('show'));
-el('imageGenModal').addEventListener('click', function (e) {
-  if (e.target === this) this.classList.remove('show');
-});
-
-// Size chips
 document.querySelectorAll('.size-chip').forEach(chip => {
   chip.addEventListener('click', () => {
-    document.querySelectorAll('.size-chip').forEach(c => c.classList.remove('selected'));
-    chip.classList.add('selected');
+    document.querySelectorAll('.size-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
   });
 });
 
-el('imgGenSubmit').addEventListener('click', async () => {
-  const prompt = (el('imgGenPrompt').value || '').trim();
-  if (!prompt) { alert('Please describe the image.'); return; }
+$('generateImageBtn').addEventListener('click', async () => {
+  const prompt = ($('imagePrompt')?.value || '').trim();
+  if (!prompt) { showToast('Please describe the image.', 'error'); return; }
 
   const ok = await useCredit();
-  if (!ok) { el('imageGenModal').classList.remove('show'); openProfileModal('subscription'); return; }
+  if (!ok) { $('imageGenModal').classList.remove('open'); openProfile('plans'); return; }
 
-  const sizeEl = document.querySelector('.size-chip.selected');
+  const sizeEl = document.querySelector('.size-chip.active');
   const size = sizeEl ? sizeEl.dataset.size : '1024x1024';
-  const btn = el('imgGenSubmit');
-  const res = el('imgGenResult');
+  const btn = $('generateImageBtn'), resEl = $('imageResult');
 
   btn.disabled = true; btn.textContent = 'Generating...';
-  res.innerHTML = '<p style="color:var(--dim);text-align:center;padding:20px;font-size:13px;">🎨 Creating your image...</p>';
+  resEl.innerHTML = '<p style="color:var(--txd);text-align:center;padding:20px;font-size:13px;">🎨 Creating your image...</p>';
 
   try {
     const r = await apiFetch('/.netlify/functions/generate-image', {
@@ -365,825 +408,829 @@ el('imgGenSubmit').addEventListener('click', async () => {
     const data = await r.json();
 
     if (r.status === 402) {
-      res.innerHTML = '';
-      el('imageGenModal').classList.remove('show');
-      openProfileModal('subscription');
+      resEl.innerHTML = '';
+      $('imageGenModal').classList.remove('open');
+      openProfile('plans');
       return;
     }
     if (!r.ok) throw new Error(data.error || 'Generation failed');
 
-    res.innerHTML = `<img src="data:image/png;base64,${data.b64}" alt="Generated" style="width:100%;border-radius:12px;display:block;margin-bottom:10px;"><button id="dlGenImg" style="display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:10px;background:var(--bg-b);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;cursor:pointer;">${I.dl} Download Image</button>`;
-    el('dlGenImg').addEventListener('click', () => {
-      const a = document.createElement('a');
-      a.href = 'data:image/png;base64,' + data.b64;
-      a.download = 'Fexer-AI-Image.png';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    });
+    resEl.innerHTML = `
+      <img src="data:image/png;base64,${data.b64}" alt="Generated" style="width:100%;border-radius:12px;display:block;margin-bottom:10px;">
+      <button id="dlImgBtn" class="sec-btn" style="width:100%;justify-content:center;">${IC.dl} Download Image</button>
+    `;
+    $('dlImgBtn').addEventListener('click', () => downloadImage(data.b64));
+
   } catch (e) {
-    res.innerHTML = `<p style="color:var(--red);text-align:center;font-size:13px;">❌ ${e.message}</p>`;
+    resEl.innerHTML = `<p style="color:var(--red);text-align:center;font-size:13px;">❌ ${e.message}</p>`;
   }
 
   btn.disabled = false;
   btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Generate`;
 });
 
-// ════════════════════════════════════════════
-//  SETTINGS & STORAGE
-// ════════════════════════════════════════════
-let appSettings = {
-  toolsEnabled: true,
-  deepSearch: false,
-  deepThinking: false,
-  voice: 'auto',
-  style: 'normal',
-  customInstructions: ''
-};
-
-function saveSettings() {
-  try { localStorage.setItem('fexerSettings', JSON.stringify(appSettings)); } catch (e) { }
-}
-
-function loadSettings() {
-  try {
-    const s = localStorage.getItem('fexerSettings');
-    if (s) Object.assign(appSettings, JSON.parse(s));
-  } catch (e) { }
-  el('toolsToggle')?.classList.toggle('on', appSettings.toolsEnabled);
-  el('searchToggle')?.classList.toggle('on', appSettings.deepSearch);
-  document.querySelectorAll('#styleChips .chip').forEach(c =>
-    c.classList.toggle('active', c.dataset.style === (appSettings.style || 'normal'))
-  );
-  document.querySelectorAll('#voiceChips .chip').forEach(c =>
-    c.classList.toggle('active', c.dataset.voice === (appSettings.voice || 'auto'))
-  );
-  if (appSettings.customInstructions) {
-    const pi = el('profileInstructions');
-    if (pi) pi.value = appSettings.customInstructions;
-  }
-}
-
-el('toolsToggle').addEventListener('click', () => {
-  appSettings.toolsEnabled = !appSettings.toolsEnabled;
-  el('toolsToggle').classList.toggle('on', appSettings.toolsEnabled);
-  saveSettings();
-});
-el('searchToggle').addEventListener('click', () => {
-  appSettings.deepSearch = !appSettings.deepSearch;
-  el('searchToggle').classList.toggle('on', appSettings.deepSearch);
-  saveSettings();
-});
-
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 //  CHAT STATE
-// ════════════════════════════════════════════
-let chats = {}, chatOrder = [], currentChatId = null;
-let isDraft = false, draftChat = null;
-let isTemp = false, tempChat = null;
-let selImage = null, selFileContent = null, selFileName = null;
-let isWaiting = false, voiceOn = false, isListening = false;
-let abortCtrl = null, curPlayer = null;
+// ══════════════════════════════════════
+let CHATS = {};
+let CHAT_ORDER = [];
+let CURRENT_CHAT = null;
+let IS_DRAFT = false, DRAFT_CHAT = null;
+let IS_TEMP = false, TEMP_CHAT = null;
+
+let SEL_IMAGE = null, SEL_FILE = null, SEL_FILE_NAME = null;
+let IS_WAITING = false, ABORT = null, CUR_PLAYER = null;
+let VOICE_ON = false, IS_LISTENING = false;
 
 function activeChat() {
-  if (isDraft) return draftChat;
-  if (isTemp) return tempChat;
-  return chats[currentChatId];
+  if (IS_DRAFT) return DRAFT_CHAT;
+  if (IS_TEMP) return TEMP_CHAT;
+  return CHATS[CURRENT_CHAT];
 }
 
 function chatVoice() {
-  if (appSettings.voice !== 'auto') return appSettings.voice;
-  const c = activeChat();
-  if (!c.voice) { c.voice = randVoice(); if (!isDraft && !isTemp) saveChats(); }
+  if (SETTINGS.voice !== 'auto') return SETTINGS.voice;
+  const c = activeChat(); if (!c) return rndVoice();
+  if (!c.voice) {
+    c.voice = rndVoice();
+    if (!IS_DRAFT && !IS_TEMP) saveChats();
+  }
   return c.voice;
 }
 
 function saveChats() {
-  try { localStorage.setItem('fexerChats', JSON.stringify({ chats, chatOrder })); } catch (e) { }
+  Store.set('fexerChats', { chats: CHATS, order: CHAT_ORDER });
 }
 
 function loadChats() {
-  try {
-    const s = localStorage.getItem('fexerChats');
-    if (s) { const p = JSON.parse(s); chats = p.chats || {}; chatOrder = p.chatOrder || []; }
-  } catch (e) { }
-  chatOrder.length
-    ? (currentChatId = chatOrder[0], renderChatList(), renderChat())
-    : startDraft();
+  const data = Store.get('fexerChats', { chats: {}, order: [] });
+  CHATS = data.chats || {};
+  CHAT_ORDER = data.order || [];
+
+  if (CHAT_ORDER.length) {
+    CURRENT_CHAT = CHAT_ORDER[0];
+    renderChatList();
+    renderMessages();
+  } else {
+    startDraft();
+  }
 }
 
 // ── Draft / Temp ──
 function startDraft() {
-  isTemp = false; tempChat = null;
-  isDraft = true; draftChat = { title: 'New Chat', messages: [], voice: randVoice() };
-  currentChatId = null;
-  renderChatList(); renderChat(); updateHeader(); closeSidebar();
+  IS_TEMP = false; TEMP_CHAT = null;
+  IS_DRAFT = true;
+  DRAFT_CHAT = { title: 'New Chat', messages: [], voice: rndVoice() };
+  CURRENT_CHAT = null;
+  renderChatList(); renderMessages(); setHeader(); closeSidebar();
 }
 
 function startTemp() {
-  isDraft = false; draftChat = null;
-  isTemp = true; tempChat = { title: 'Temporary Chat', messages: [], voice: randVoice() };
-  renderChatList(); renderChat(); updateHeader(); closeSidebar();
+  IS_DRAFT = false; DRAFT_CHAT = null;
+  IS_TEMP = true;
+  TEMP_CHAT = { title: 'Temporary Chat', messages: [], voice: rndVoice() };
+  renderChatList(); renderMessages(); setHeader(); closeSidebar();
 }
 
-function exitTemp() { isTemp = false; tempChat = null; }
+function exitTemp() { IS_TEMP = false; TEMP_CHAT = null; }
 
 function promoteDraft() {
-  if (!isDraft) return;
-  const id = 'chat_' + Date.now();
-  chats[id] = draftChat; chatOrder.unshift(id); currentChatId = id;
-  isDraft = false; draftChat = null;
+  if (!IS_DRAFT) return;
+  const id = genId('chat');
+  CHATS[id] = DRAFT_CHAT;
+  CHAT_ORDER.unshift(id);
+  CURRENT_CHAT = id;
+  IS_DRAFT = false;
+  DRAFT_CHAT = null;
 }
 
-el('ghostChatBtn').addEventListener('click', startTemp);
+// ── Header ──
+function setHeader() {
+  const t = $('chatTitle'); if (!t) return;
+  if (IS_TEMP) t.textContent = '🕶️ Temporary Chat';
+  else if (IS_DRAFT) t.textContent = 'Fexer AI';
+  else t.textContent = CHATS[CURRENT_CHAT]?.title || 'Fexer AI';
 
-function updateHeader() {
-  const c = activeChat();
-  const has = c && c.messages.length > 0;
-  el('ghostChatBtn').hidden = has;
-  el('chatBubbleWrap').hidden = !has;
-  const t = el('chatTitle');
-  if (t) {
-    if (isTemp) t.textContent = '🕶️ Temporary Chat';
-    else if (isDraft) t.textContent = 'Fexer AI';
-    else t.textContent = (chats[currentChatId]?.title) || 'Fexer AI';
-  }
+  const gb = $('ghostBtn');
+  if (gb) gb.classList.toggle('ghost-active', IS_TEMP);
 }
 
-// ── Chat List ──
-function switchChat(id) {
-  isDraft = false; draftChat = null; exitTemp(); currentChatId = id;
-  renderChatList(); renderChat(); updateHeader(); closeSidebar();
-}
+$('ghostBtn').addEventListener('click', () => {
+  IS_TEMP ? (exitTemp(), startDraft()) : startTemp();
+});
+$('hdrNewChatBtn').addEventListener('click', startDraft);
+$('newChatBtn').addEventListener('click', startDraft);
 
-function delChat(id) {
-  delete chats[id]; chatOrder = chatOrder.filter(x => x !== id);
-  if (currentChatId === id) {
-    chatOrder.length
-      ? (currentChatId = chatOrder[0], isDraft = false, draftChat = null)
-      : startDraft();
-  }
-  saveChats(); renderChatList(); renderChat(); updateHeader();
-}
-
-function renderChatList(q) {
-  const list = el('chatList'); if (!list) return;
-  list.innerHTML = '';
-  const query = (q || '').toLowerCase();
-  let ids = chatOrder.filter(id => chats[id] && (!query || chats[id].title.toLowerCase().includes(query)));
-  ids.sort((a, b) => (chats[b].starred ? 1 : 0) - (chats[a].starred ? 1 : 0));
-
-  ids.forEach(id => {
-    const chat = chats[id];
-    const item = document.createElement('div');
-    item.className = 'chat-item' + (id === currentChatId && !isTemp && !isDraft ? ' active' : '');
-
-    const tw = document.createElement('span'); tw.className = 'chat-item-title';
-    if (chat.starred) {
-      const si = document.createElement('span'); si.className = 'chat-star'; si.innerHTML = I.star; tw.appendChild(si);
-    }
-    const tt = document.createElement('span'); tt.className = 'chat-item-title-text'; tt.textContent = chat.title; tw.appendChild(tt);
-    item.appendChild(tw);
-
-    const db = document.createElement('button'); db.className = 'chat-del-btn'; db.innerHTML = I.trash;
-    db.addEventListener('click', e => { e.stopPropagation(); if (confirm('Delete?')) delChat(id); });
-    item.appendChild(db);
-
-    let pt = null, lp = false;
-    const sl = () => { lp = false; pt = setTimeout(() => { lp = true; item.classList.add('show-delete'); }, 500); };
-    const cl = () => clearTimeout(pt);
-    item.addEventListener('mousedown', sl); item.addEventListener('touchstart', sl, { passive: true });
-    ['mouseup', 'mouseleave', 'touchend'].forEach(ev => item.addEventListener(ev, cl));
-    item.addEventListener('click', () => {
-      if (lp) return;
-      if (item.classList.contains('show-delete')) { item.classList.remove('show-delete'); return; }
-      switchChat(id);
-    });
-    list.appendChild(item);
-  });
-}
-
-el('chatSearchInput').addEventListener('input', function () { renderChatList(this.value); });
-el('sidebarNewChatBtn').addEventListener('click', startDraft);
-el('bubbleNewChatBtn').addEventListener('click', startDraft);
-
-// ── 3-dot Menu ──
-el('chatMenuBtn').addEventListener('click', function (e) {
+// ── 3-dot menu ──
+$('chatMenuBtn').addEventListener('click', function (e) {
   e.stopPropagation();
-  if (isTemp) { if (confirm('End temporary chat?')) { exitTemp(); startDraft(); } return; }
-  const c = chats[currentChatId];
-  const lbl = el('starLabel'); if (c && lbl) lbl.textContent = c.starred ? 'Unstar' : 'Star';
-  el('chatDropdown').classList.toggle('show');
+  const dd = $('chatDropdown'); dd.classList.toggle('open');
+  const c = CHATS[CURRENT_CHAT];
+  const sl = $('starLabel'); if (sl) sl.textContent = c?.starred ? 'Unstar' : 'Star';
 });
 
-el('optStarBtn').addEventListener('click', () => {
-  el('chatDropdown').classList.remove('show');
-  if (!isDraft && !isTemp && chats[currentChatId]) {
-    chats[currentChatId].starred = !chats[currentChatId].starred;
+$('starBtn').addEventListener('click', () => {
+  $('chatDropdown').classList.remove('open');
+  if (!IS_DRAFT && !IS_TEMP && CHATS[CURRENT_CHAT]) {
+    CHATS[CURRENT_CHAT].starred = !CHATS[CURRENT_CHAT].starred;
     saveChats(); renderChatList();
   }
 });
 
-el('optRenameBtn').addEventListener('click', () => {
-  el('chatDropdown').classList.remove('show');
-  if (!isDraft && !isTemp && chats[currentChatId]) {
-    const n = prompt('Rename:', chats[currentChatId].title);
-    if (n?.trim()) { chats[currentChatId].title = n.trim(); saveChats(); renderChatList(); updateHeader(); }
+$('renameBtn').addEventListener('click', () => {
+  $('chatDropdown').classList.remove('open');
+  if (!IS_DRAFT && !IS_TEMP && CHATS[CURRENT_CHAT]) {
+    const n = prompt('Rename:', CHATS[CURRENT_CHAT].title);
+    if (n?.trim()) {
+      CHATS[CURRENT_CHAT].title = n.trim();
+      saveChats(); renderChatList(); setHeader();
+    }
   }
 });
 
-el('optDeleteBtn').addEventListener('click', () => {
-  el('chatDropdown').classList.remove('show');
-  if (confirm('Delete this chat?')) delChat(currentChatId);
+$('deleteChatBtn').addEventListener('click', () => {
+  $('chatDropdown').classList.remove('open');
+  if (confirm('Delete this chat?')) deleteChat(CURRENT_CHAT);
 });
 
+// Close dropdowns on outside click
 document.addEventListener('click', e => {
-  const am = el('attachMenu'), ab = el('attachBtn');
-  const dd = el('chatDropdown'), mb = el('chatMenuBtn');
-  if (am && ab && !am.contains(e.target) && e.target !== ab) am.classList.remove('show');
-  if (dd && mb && !dd.contains(e.target) && !mb.contains(e.target)) dd.classList.remove('show');
+  const am = $('attachMenu'), ab = $('attachBtn');
+  const dd = $('chatDropdown'), mb = $('chatMenuBtn');
+  if (am && !am.contains(e.target) && e.target !== ab) am.classList.remove('open');
+  if (dd && !dd.contains(e.target) && e.target !== mb) dd.classList.remove('open');
 });
 
-// ════════════════════════════════════════════
-//  SIDEBAR
-// ════════════════════════════════════════════
-el('menuToggle').addEventListener('click', () => {
-  el('sidebar').classList.toggle('open');
-  el('sidebarOverlay').classList.toggle('active');
-});
-el('sidebarOverlay').addEventListener('click', closeSidebar);
-el('sidebarCloseBtn').addEventListener('click', closeSidebar);
-function closeSidebar() {
-  el('sidebar').classList.remove('open');
-  el('sidebarOverlay').classList.remove('active');
+// ── Chat List ──
+function switchChat(id) {
+  IS_DRAFT = false; DRAFT_CHAT = null; exitTemp();
+  CURRENT_CHAT = id;
+  renderChatList(); renderMessages(); setHeader(); closeSidebar();
 }
 
-// ════════════════════════════════════════════
-//  ATTACH MENU
-// ════════════════════════════════════════════
-el('attachBtn').addEventListener('click', function (e) {
-  e.stopPropagation();
-  el('attachMenu').classList.toggle('show');
-});
-el('choosePhotoBtn').addEventListener('click', () => { el('imageInput').click(); el('attachMenu').classList.remove('show'); });
-el('takePhotoBtn').addEventListener('click', () => { el('attachMenu').classList.remove('show'); openCamera(); });
-el('chooseFileBtn').addEventListener('click', () => { el('fileInput').click(); el('attachMenu').classList.remove('show'); });
+function deleteChat(id) {
+  delete CHATS[id];
+  CHAT_ORDER = CHAT_ORDER.filter(x => x !== id);
+  if (CURRENT_CHAT === id) {
+    CHAT_ORDER.length
+      ? (CURRENT_CHAT = CHAT_ORDER[0], IS_DRAFT = false, DRAFT_CHAT = null)
+      : startDraft();
+  }
+  saveChats(); renderChatList(); renderMessages(); setHeader();
+}
 
-// File inputs
-el('imageInput').addEventListener('change', function (e) {
+function renderChatList(q) {
+  const list = $('chatList'); if (!list) return;
+  list.innerHTML = '';
+  const query = (q || '').toLowerCase();
+  let ids = CHAT_ORDER.filter(id =>
+    CHATS[id] && (!query || CHATS[id].title.toLowerCase().includes(query))
+  );
+  ids.sort((a, b) => (CHATS[b].starred ? 1 : 0) - (CHATS[a].starred ? 1 : 0));
+
+  if (!ids.length) {
+    list.innerHTML = '<div class="sb-empty">No chats yet</div>';
+    return;
+  }
+
+  ids.forEach(id => {
+    const chat = CHATS[id];
+    const item = document.createElement('div');
+    item.className = 'chat-item' + (id === CURRENT_CHAT && !IS_TEMP && !IS_DRAFT ? ' active' : '');
+
+    const tw = document.createElement('span'); tw.className = 'chat-item-title';
+    if (chat.starred) {
+      const si = document.createElement('span'); si.className = 'chat-star-icon'; si.innerHTML = IC.star; tw.appendChild(si);
+    }
+    const tt = document.createElement('span'); tt.className = 'chat-item-text'; tt.textContent = chat.title; tw.appendChild(tt);
+    item.appendChild(tw);
+
+    const db = document.createElement('button'); db.className = 'chat-del-btn'; db.innerHTML = IC.trash;
+    db.addEventListener('click', e => { e.stopPropagation(); if (confirm('Delete?')) deleteChat(id); });
+    item.appendChild(db);
+
+    let pressTimer = null, didLong = false;
+    const onDown = () => { didLong = false; pressTimer = setTimeout(() => { didLong = true; item.classList.add('show-delete'); }, 500); };
+    const onUp = () => clearTimeout(pressTimer);
+    item.addEventListener('mousedown', onDown);
+    item.addEventListener('touchstart', onDown, { passive: true });
+    ['mouseup', 'mouseleave', 'touchend'].forEach(ev => item.addEventListener(ev, onUp));
+    item.addEventListener('click', () => {
+      if (didLong) return;
+      if (item.classList.contains('show-delete')) { item.classList.remove('show-delete'); return; }
+      switchChat(id);
+    });
+
+    list.appendChild(item);
+  });
+}
+
+$('chatSearch').addEventListener('input', FexerUtils.debounce(function () {
+  renderChatList(this.value);
+}, 200));
+
+// ══════════════════════════════════════
+//  ATTACH MENU
+// ══════════════════════════════════════
+$('attachBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  $('attachMenu').classList.toggle('open');
+});
+
+$('photoBtn').addEventListener('click', () => { $('photoInput').click(); $('attachMenu').classList.remove('open'); });
+$('cameraBtn').addEventListener('click', () => { $('attachMenu').classList.remove('open'); openCamera(); });
+$('fileBtn').addEventListener('click', () => { $('fileInput').click(); $('attachMenu').classList.remove('open'); });
+
+$('photoInput').addEventListener('change', async function (e) {
   const f = e.target.files[0]; if (!f) return;
-  selFileContent = null; selFileName = null;
-  if (f.type.startsWith('video/')) extractFrame(f, b => { selImage = b; showImgPrev(b, true); updateBtn(); });
-  else compressImg(f, b => { selImage = b; showImgPrev(b, false); updateBtn(); });
+  SEL_FILE = null; SEL_FILE_NAME = null;
+  if (f.type.startsWith('video/')) {
+    const b64 = await extractFrame(f);
+    if (b64) { SEL_IMAGE = b64; showImgPreview(b64, true); updateBtn(); }
+  } else {
+    const b64 = await compressImg(f);
+    SEL_IMAGE = b64; showImgPreview(b64, false); updateBtn();
+  }
   e.target.value = '';
 });
 
-el('fileInput').addEventListener('change', function (e) {
-  const f = e.target.files[0]; if (!f) return; selImage = null;
-  const r = new FileReader();
-  r.onload = ev => { selFileContent = ev.target.result; selFileName = f.name; showFilePrev(f.name); updateBtn(); };
-  r.readAsText(f); e.target.value = '';
+$('fileInput').addEventListener('change', function (e) {
+  const f = e.target.files[0]; if (!f) return;
+  SEL_IMAGE = null;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    SEL_FILE = ev.target.result;
+    SEL_FILE_NAME = f.name;
+    showFilePreview(f.name);
+    updateBtn();
+  };
+  reader.readAsText(f);
+  e.target.value = '';
 });
 
-function compressImg(file, cb) {
-  const r = new FileReader();
-  r.onload = ev => {
-    const img = new Image();
-    img.onload = () => {
-      let w = img.width, h = img.height;
-      if (w > 1024) { h = Math.round(h * 1024 / w); w = 1024; }
-      const c = document.createElement('canvas'); c.width = w; c.height = h;
-      c.getContext('2d').drawImage(img, 0, 0, w, h);
-      cb(c.toDataURL('image/jpeg', 0.8));
-    };
-    img.src = ev.target.result;
-  };
-  r.readAsDataURL(file);
+function showImgPreview(b64, isVid) {
+  const a = $('previewArea'); if (!a) return;
+  a.innerHTML = `
+    <div class="prev-img">
+      <img src="${b64}" alt="preview">
+      ${isVid ? '<span class="vid-badge">Video frame</span>' : ''}
+      <button class="rm-btn" id="rmPreview">×</button>
+    </div>`;
+  a.classList.add('has-preview');
+  $('rmPreview')?.addEventListener('click', clearPreview);
 }
 
-function extractFrame(file, cb) {
-  const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true;
-  v.src = URL.createObjectURL(file);
-  v.addEventListener('loadeddata', () => { v.currentTime = Math.min(0.3, v.duration / 2); });
-  v.addEventListener('seeked', () => {
-    let w = v.videoWidth, h = v.videoHeight;
-    if (w > 1024) { h = Math.round(h * 1024 / w); w = 1024; }
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    c.getContext('2d').drawImage(v, 0, 0, w, h);
-    URL.revokeObjectURL(v.src); cb(c.toDataURL('image/jpeg', 0.8));
-  });
-}
-
-function showImgPrev(b, isVid) {
-  const a = el('previewArea');
-  a.innerHTML = `<div class="prev-img-chip"><img src="${b}" alt="preview">${isVid ? '<span class="video-badge">Video frame</span>' : ''}<button class="rm-prev-btn" id="rmPrev">×</button></div>`;
-  a.classList.add('show');
-  el('rmPrev').addEventListener('click', clearPreview);
-}
-
-function showFilePrev(name) {
-  const a = el('previewArea');
-  a.innerHTML = `<div class="prev-file-chip">${I.pdf}<span class="prev-file-name">${esc(name)}</span><button class="rm-prev-btn" id="rmPrev" style="position:static;margin-left:auto;">×</button></div>`;
-  a.classList.add('show');
-  el('rmPrev').addEventListener('click', clearPreview);
+function showFilePreview(name) {
+  const a = $('previewArea'); if (!a) return;
+  a.innerHTML = `
+    <div class="prev-file">
+      ${IC.pdf}
+      <span class="prev-file-name">${esc(name)}</span>
+      <button class="rm-btn" id="rmPreview" style="position:static;margin-left:auto;">×</button>
+    </div>`;
+  a.classList.add('has-preview');
+  $('rmPreview')?.addEventListener('click', clearPreview);
 }
 
 function clearPreview() {
-  selImage = null; selFileContent = null; selFileName = null;
-  const a = el('previewArea'); a.innerHTML = ''; a.classList.remove('show'); updateBtn();
+  SEL_IMAGE = null; SEL_FILE = null; SEL_FILE_NAME = null;
+  const a = $('previewArea');
+  if (a) { a.innerHTML = ''; a.classList.remove('has-preview'); }
+  updateBtn();
 }
 
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 //  CAMERA
-// ════════════════════════════════════════════
-let camStream = null, camFacing = 'user';
+// ══════════════════════════════════════
+let CAM_STREAM = null, CAM_FACING = 'user';
 
 async function openCamera() {
-  el('cameraOverlay').classList.add('show');
-  camFacing = 'user'; await startCam();
+  $('cameraOverlay').classList.add('active');
+  CAM_FACING = 'user';
+  await startCam();
 }
 
 async function startCam() {
-  if (camStream) camStream.getTracks().forEach(t => t.stop());
+  if (CAM_STREAM) CAM_STREAM.getTracks().forEach(t => t.stop());
   try {
-    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: camFacing } });
-    el('camVideo').srcObject = camStream;
-  } catch (e) { addBubble('⚠️ Camera access denied.', 'bot-message'); closeCamera(); }
+    CAM_STREAM = await navigator.mediaDevices.getUserMedia({ video: { facingMode: CAM_FACING } });
+    $('camVideo').srcObject = CAM_STREAM;
+  } catch (e) {
+    addBubble('⚠️ Camera access denied.', 'bot');
+    closeCamera();
+  }
 }
 
-el('camSwitchBtn').addEventListener('click', () => { camFacing = camFacing === 'user' ? 'environment' : 'user'; startCam(); });
-el('camCaptureBtn').addEventListener('click', () => {
-  const v = el('camVideo'), c = el('camCanvas');
+$('camSwitch').addEventListener('click', () => {
+  CAM_FACING = CAM_FACING === 'user' ? 'environment' : 'user';
+  startCam();
+});
+
+$('camCapture').addEventListener('click', () => {
+  const v = $('camVideo'), c = $('camCanvas');
   c.width = v.videoWidth; c.height = v.videoHeight;
   c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
-  const b = c.toDataURL('image/jpeg', 0.9);
-  selImage = b; selFileContent = null; selFileName = null;
-  showImgPrev(b, false); updateBtn(); closeCamera();
+  const b64 = c.toDataURL('image/jpeg', 0.9);
+  SEL_IMAGE = b64; SEL_FILE = null; SEL_FILE_NAME = null;
+  showImgPreview(b64, false); updateBtn(); closeCamera();
 });
-el('camCancelBtn').addEventListener('click', closeCamera);
+
+$('camCancel').addEventListener('click', closeCamera);
 
 function closeCamera() {
-  el('cameraOverlay').classList.remove('show');
-  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  $('cameraOverlay').classList.remove('active');
+  if (CAM_STREAM) { CAM_STREAM.getTracks().forEach(t => t.stop()); CAM_STREAM = null; }
 }
 
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 //  MIC (DICTATION)
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recog = null;
+let RECOG = null;
 
 if (SR) {
-  recog = new SR(); recog.lang = 'en-US'; recog.continuous = false; recog.interimResults = false;
-  recog.onresult = e => { el('userInput').value = e.results[0][0].transcript; updateBtn(); };
-  recog.onend = () => { isListening = false; el('micBtn').classList.remove('listening'); };
-  recog.onerror = () => { isListening = false; el('micBtn').classList.remove('listening'); };
-  el('micBtn').addEventListener('click', () => {
-    if (isListening) { recog.stop(); }
-    else { try { isListening = true; el('micBtn').classList.add('listening'); recog.start(); } catch (e) { isListening = false; } }
+  RECOG = new SR();
+  RECOG.lang = 'en-US'; RECOG.continuous = false; RECOG.interimResults = false;
+  RECOG.onresult = e => { $('msgInput').value = e.results[0][0].transcript; updateBtn(); };
+  RECOG.onend = () => { IS_LISTENING = false; $('micBtn').classList.remove('listening'); };
+  RECOG.onerror = () => { IS_LISTENING = false; $('micBtn').classList.remove('listening'); };
+  $('micBtn').addEventListener('click', () => {
+    if (IS_LISTENING) { RECOG.stop(); }
+    else {
+      try { IS_LISTENING = true; $('micBtn').classList.add('listening'); RECOG.start(); }
+      catch (e) { IS_LISTENING = false; }
+    }
   });
-} else { el('micBtn').style.display = 'none'; }
-
-// ════════════════════════════════════════════
-//  ACTION BUTTON
-// ════════════════════════════════════════════
-function updateBtn() {
-  const btn = el('actionBtn');
-  btn.classList.remove('is-send', 'is-stop', 'is-voice');
-
-  if (isWaiting) {
-    btn.innerHTML = I.stop; btn.classList.add('is-stop');
-    btn.onclick = () => { if (abortCtrl) abortCtrl.abort(); };
-    return;
-  }
-  if (voiceOn) {
-    btn.innerHTML = I.voice; btn.classList.add('is-voice');
-    btn.onclick = stopVoice; return;
-  }
-  const has = el('userInput').value.trim() || selImage || selFileContent;
-  if (has) { btn.innerHTML = I.send; btn.classList.add('is-send'); btn.onclick = sendMsg; }
-  else { btn.innerHTML = I.voice; btn.onclick = startVoice; }
+} else {
+  $('micBtn').style.display = 'none';
 }
 
-el('userInput').addEventListener('input', updateBtn);
-el('userInput').addEventListener('keypress', e => { if (e.key === 'Enter') sendMsg(); });
+// ══════════════════════════════════════
+//  ACTION BUTTON
+// ══════════════════════════════════════
+function updateBtn() {
+  const btn = $('actionBtn'); if (!btn) return;
+  btn.className = 'action-btn';
 
-// ════════════════════════════════════════════
+  if (IS_WAITING) {
+    btn.innerHTML = IC.stop; btn.classList.add('stop-mode');
+    btn.onclick = () => { if (ABORT) ABORT.abort(); };
+    return;
+  }
+  if (VOICE_ON) {
+    btn.innerHTML = IC.voice; btn.classList.add('voice-mode');
+    btn.onclick = stopVoice;
+    return;
+  }
+  const hasInput = ($('msgInput')?.value.trim()) || SEL_IMAGE || SEL_FILE;
+  if (hasInput) {
+    btn.innerHTML = IC.send; btn.classList.add('send-mode');
+    btn.onclick = sendMsg;
+  } else {
+    btn.innerHTML = IC.voice;
+    btn.onclick = startVoice;
+  }
+}
+
+$('msgInput').addEventListener('input', updateBtn);
+$('msgInput').addEventListener('keypress', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+
+// ══════════════════════════════════════
 //  SEND MESSAGE
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 async function sendMsg() {
-  const inp = el('userInput');
+  const inp = $('msgInput'); if (!inp) return;
   let txt = inp.value.trim();
-  if (!txt && !selImage && !selFileContent) return;
+  if (!txt && !SEL_IMAGE && !SEL_FILE) return;
 
   const ok = await useCredit();
-  if (!ok) { openProfileModal('subscription'); return; }
+  if (!ok) { openProfile('plans'); return; }
 
   promoteDraft();
-  const chat = activeChat();
+  const chat = activeChat(); if (!chat) return;
 
-  if (selFileContent) {
-    const block = `Attached file: ${selFileName}\n\`\`\`\n${selFileContent.slice(0, 20000)}\n\`\`\``;
+  // File content append
+  if (SEL_FILE) {
+    const block = `Attached file: ${SEL_FILE_NAME}\n\`\`\`\n${SEL_FILE.slice(0, 20000)}\n\`\`\``;
     txt = txt ? txt + '\n\n' + block : block;
   }
 
+  // Content build
   let content;
-  if (selImage) {
-    content = []; if (txt) content.push({ type: 'text', text: txt });
-    content.push({ type: 'image_url', image_url: { url: selImage } });
-  } else { content = txt; }
-
-  if (!chat.messages.length) {
-    const src = inp.value.trim() || selFileName || 'Image';
-    chat.title = src.length > 35 ? src.slice(0, 35) + '...' : src;
-    if (!isTemp) renderChatList();
+  if (SEL_IMAGE) {
+    content = [];
+    if (txt) content.push({ type: 'text', text: txt });
+    content.push({ type: 'image_url', image_url: { url: SEL_IMAGE } });
+  } else {
+    content = txt;
   }
 
-  addBubble(content, 'user-message');
-  chat.messages.push({ role: 'user', content });
-  if (!isTemp) saveChats();
-  updateHeader(); inp.value = ''; clearPreview();
+  // First message — set title
+  if (!chat.messages.length) {
+    const src = inp.value.trim() || SEL_FILE_NAME || 'Image';
+    chat.title = truncate(src, 35);
+    if (!IS_TEMP) renderChatList();
+  }
 
-  isWaiting = true; setDis(true); updateBtn(); showTyping();
-  if (voiceOn) setOrbState('thinking');
-  abortCtrl = new AbortController();
+  addBubble(content, 'user');
+  chat.messages.push({ role: 'user', content });
+  if (!IS_TEMP) saveChats();
+  setHeader();
+  inp.value = ''; clearPreview();
+
+  IS_WAITING = true; disableInput(true); updateBtn(); showTyping();
+  if (VOICE_ON) setOrb('thinking');
+  ABORT = new AbortController();
 
   try {
     const r = await apiFetch('/.netlify/functions/chat', {
       method: 'POST',
       body: JSON.stringify({
         messages: chat.messages,
-        voiceMode: voiceOn,
-        deepThinking: appSettings.deepThinking,
-        deepSearch: appSettings.deepSearch,
-        customInstructions: appSettings.customInstructions || '',
-        toolsEnabled: appSettings.toolsEnabled
+        voiceMode: VOICE_ON,
+        deepThinking: SETTINGS.deepThinking,
+        deepSearch: SETTINGS.deepSearch,
+        customInstructions: SETTINGS.customInstructions || '',
+        toolsEnabled: SETTINGS.toolsEnabled
       }),
-      signal: abortCtrl.signal
+      signal: ABORT.signal
     });
 
     if (r.status === 402) {
-      removeTyping(); chatDone();
-      addBubble("⚠️ You've run out of credits for today. Upgrade to continue.", 'bot-message');
-      openProfileModal('subscription'); return;
+      removeTyping(); doneSend();
+      addBubble("⚠️ You've run out of credits for today. Upgrade to continue.", 'bot');
+      openProfile('plans');
+      return;
     }
 
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      removeTyping(); addBubble('⚠️ ' + (d.error || 'Server error. Please try again.'), 'bot-message');
-      chatDone(); return;
+      removeTyping();
+      addBubble('⚠️ ' + (d.error || 'Server error. Please try again.'), 'bot');
+      doneSend(); return;
     }
 
     const data = await r.json();
     const reply = data.choices[0].message.content;
 
-    removeTyping(); addBubble(reply, 'bot-message');
+    removeTyping(); addBubble(reply, 'bot');
     chat.messages.push({ role: 'assistant', content: reply });
-    if (!isTemp) saveChats();
-    chatDone();
+    if (!IS_TEMP) saveChats();
+    doneSend();
 
-    if (voiceOn) {
-      setOrbState('speaking');
-      await playTTS(speakableText(reply));
-      if (voiceOn) { setOrbState('listening'); startRecording(); }
+    if (VOICE_ON) {
+      setOrb('speaking');
+      await tts(speakable(reply));
+      if (VOICE_ON) { setOrb('listening'); startRecording(); }
     }
 
   } catch (e) {
     removeTyping();
-    addBubble(e.name === 'AbortError' ? '⏹️ Stopped.' : '⚠️ Connection error. Please check your internet.', 'bot-message');
-    chatDone();
+    addBubble(
+      e.name === 'AbortError'
+        ? '⏹️ Stopped.'
+        : '⚠️ Connection error. Please check your internet.',
+      'bot'
+    );
+    doneSend();
   }
 }
 
-function chatDone() {
-  isWaiting = false; abortCtrl = null; setDis(false); updateBtn();
-}
-
-function setDis(v) {
-  ['userInput', 'attachBtn', 'micBtn'].forEach(id => {
-    const e = el(id); if (e) e.disabled = v;
+function doneSend() { IS_WAITING = false; ABORT = null; disableInput(false); updateBtn(); }
+function disableInput(v) {
+  ['msgInput', 'attachBtn', 'micBtn'].forEach(id => {
+    const el = $(id); if (el) el.disabled = v;
   });
 }
 
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 //  RENDER MESSAGES
-// ════════════════════════════════════════════
-function renderChat() {
-  const msgs = el('chatMessages'); if (!msgs) return;
-  msgs.innerHTML = '';
-  const chat = activeChat();
-  if (isTemp) addBubble("🕶️ Temporary Chat — this won't be saved.", 'bot-message');
-  if (!chat?.messages?.length) { if (!isTemp) addBubble('Hi! I\'m Fexer AI. How can I help you today?', 'bot-message'); return; }
-  chat.messages.forEach(m => addBubble(m.content, m.role === 'user' ? 'user-message' : 'bot-message'));
+// ══════════════════════════════════════
+function renderMessages() {
+  const el = $('chatMessages'); if (!el) return;
+  el.innerHTML = '';
+  const chat = activeChat(); if (!chat) return;
+  if (IS_TEMP) addBubble("🕶️ Temporary Chat — this conversation won't be saved.", 'bot');
+  if (!chat.messages.length) {
+    if (!IS_TEMP) addBubble('Hi! I\'m Fexer AI. How can I help you today?', 'bot');
+    return;
+  }
+  chat.messages.forEach(m => addBubble(m.content, m.role === 'user' ? 'user' : 'bot'));
 }
 
-function addBubble(content, cls) {
-  const msgs = el('chatMessages'); if (!msgs) return;
-  const div = document.createElement('div'); div.className = 'message ' + cls;
+function addBubble(content, type) {
+  const el = $('chatMessages'); if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'msg ' + (type === 'user' ? 'user-msg' : 'bot-msg');
 
   if (Array.isArray(content)) {
     content.forEach(p => {
       if (p.type === 'text') {
         const t = document.createElement('div');
-        t.innerHTML = cls === 'bot-message' ? parseMd(p.text) : esc(p.text);
+        t.innerHTML = type === 'bot' ? parseMd(p.text) : esc(p.text);
         div.appendChild(t);
       } else if (p.type === 'image_url') {
-        const img = document.createElement('img'); img.src = p.image_url.url; img.className = 'message-image'; div.appendChild(img);
+        const img = document.createElement('img');
+        img.src = p.image_url.url; img.className = 'msg-image';
+        div.appendChild(img);
       }
     });
-  } else if (cls === 'bot-message') {
+
+  } else if (type === 'bot') {
+    // Check for generated image
     const imgM = typeof content === 'string'
       ? content.match(/^\{\{FEXER_IMAGE:([\s\S]+?)\}\}\n?([\s\S]*)$/)
       : null;
 
     if (imgM) {
       const b64 = imgM[1], cap = imgM[2];
-      const img = document.createElement('img'); img.src = 'data:image/png;base64,' + b64; img.className = 'message-image'; div.appendChild(img);
+      const img = document.createElement('img');
+      img.src = 'data:image/png;base64,' + b64; img.className = 'msg-image';
+      div.appendChild(img);
       if (cap.trim()) { const c = document.createElement('div'); c.textContent = cap.trim(); div.appendChild(c); }
       const acts = document.createElement('div'); acts.className = 'msg-actions';
-      const db = document.createElement('button'); db.className = 'msg-btn'; db.innerHTML = I.dl; db.title = 'Download';
-      db.addEventListener('click', () => downloadImg(b64));
+      const db = document.createElement('button'); db.className = 'msg-btn'; db.innerHTML = IC.dl; db.title = 'Download';
+      db.addEventListener('click', () => downloadImage(b64));
       acts.appendChild(db); div.appendChild(acts);
+
     } else {
+      // Regular markdown message
       div.innerHTML = parseMd(content);
+
       // Code block copy buttons
       div.querySelectorAll('pre').forEach(pre => {
         pre.style.position = 'relative';
         const cp = document.createElement('button');
-        cp.className = 'msg-btn'; cp.innerHTML = I.copy; cp.title = 'Copy code';
+        cp.className = 'msg-btn'; cp.innerHTML = IC.copy; cp.title = 'Copy code';
         cp.style.cssText = 'position:absolute;top:6px;right:6px;';
-        cp.addEventListener('click', () => {
-          navigator.clipboard.writeText(pre.textContent.trim()).then(() => {
-            cp.style.color = '#22c55e';
-            setTimeout(() => cp.style.color = '', 1500);
-          }).catch(() => { });
+        cp.addEventListener('click', async () => {
+          const success = await copyText(pre.textContent.trim());
+          if (success) { cp.style.color = '#22c55e'; setTimeout(() => cp.style.color = '', 1500); }
         });
         pre.appendChild(cp);
       });
-      // Message actions
+
+      // Message action buttons
       const acts = document.createElement('div'); acts.className = 'msg-actions';
-      const pdfB = document.createElement('button'); pdfB.className = 'msg-btn'; pdfB.innerHTML = I.pdf; pdfB.title = 'Save PDF';
-      pdfB.addEventListener('click', () => savePDF(content));
-      const cpB = document.createElement('button'); cpB.className = 'msg-btn copy-btn'; cpB.innerHTML = I.copy; cpB.title = 'Copy';
-      cpB.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(content.replace(/\{\{FEXER_IMAGE:[\s\S]+?\}\}/g, '[image]')); cpB.classList.add('copied'); setTimeout(() => cpB.classList.remove('copied'), 1500); } catch (e) { }
+
+      const pdfBtn = document.createElement('button'); pdfBtn.className = 'msg-btn'; pdfBtn.innerHTML = IC.pdf; pdfBtn.title = 'Save PDF';
+      pdfBtn.addEventListener('click', () => savePDF(content));
+
+      const cpBtn = document.createElement('button'); cpBtn.className = 'msg-btn'; cpBtn.innerHTML = IC.copy; cpBtn.title = 'Copy';
+      cpBtn.addEventListener('click', async () => {
+        const plain = content.replace(/\{\{FEXER_IMAGE:[\s\S]+?\}\}/g, '[image]');
+        const success = await copyText(plain);
+        if (success) { cpBtn.classList.add('copy-ok'); setTimeout(() => cpBtn.classList.remove('copy-ok'), 1500); }
       });
-      acts.appendChild(pdfB); acts.appendChild(cpB); div.appendChild(acts);
+
+      acts.appendChild(pdfBtn); acts.appendChild(cpBtn); div.appendChild(acts);
     }
+
   } else {
     div.textContent = content;
   }
 
-  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
-}
-
-function parseMd(text) {
-  if (typeof marked === 'undefined') return esc(text);
-  marked.setOptions({ breaks: true, gfm: true });
-  return marked.parse(text);
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
 }
 
 function showTyping() {
-  const msgs = el('chatMessages'); if (!msgs) return;
-  const d = document.createElement('div'); d.className = 'message bot-message typing-indicator'; d.id = 'typingDot';
+  const el = $('chatMessages'); if (!el) return;
+  const d = document.createElement('div');
+  d.className = 'msg bot-msg typing'; d.id = 'typingIndicator';
   d.innerHTML = '<span></span><span></span><span></span>';
-  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
+  el.appendChild(d); el.scrollTop = el.scrollHeight;
 }
-function removeTyping() { el('typingDot')?.remove(); }
+function removeTyping() { $('typingIndicator')?.remove(); }
 
-function savePDF(text) {
-  if (typeof jspdf === 'undefined') return;
-  const doc = new jspdf.jsPDF();
-  const p = text.replace(/```([\s\S]*?)```/g, (_, c) => c.trim()).replace(/^#{1,6}\s*/gm, '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`([^`]*)`/g, '$1').replace(/^[-*]\s+/gm, '• ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-  const lines = doc.splitTextToSize(p, 180); doc.setFontSize(11); let y = 20;
-  lines.forEach(l => { if (y > doc.internal.pageSize.height - 15) { doc.addPage(); y = 20; } doc.text(l, 15, y); y += 7; });
-  doc.save('Fexer-AI.pdf');
+function speakable(t) {
+  const m = t.match(/^\{\{FEXER_IMAGE:[\s\S]+?\}\}\n?([\s\S]*)$/);
+  return m ? (m[1] || "Here's your image!") : t;
 }
 
-function downloadImg(b64) {
-  const a = document.createElement('a'); a.href = 'data:image/png;base64,' + b64; a.download = 'Fexer-AI-Image.png';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 //  LIVE VOICE
-// ════════════════════════════════════════════
-let mStream = null, mRecorder = null, mChunks = [];
-let mCtx = null, mAnalyser = null, mTimer = null, spokenAbove = false;
+// ══════════════════════════════════════
+let V_STREAM = null, V_RECORDER = null, V_CHUNKS = [];
+let V_CTX = null, V_ANALYSER = null, V_TIMER = null, V_SPOKEN = false;
 
-el('closeVoiceBtn').addEventListener('click', stopVoice);
+$('closeVoiceBtn').addEventListener('click', stopVoice);
 
 async function startVoice() {
-  if (!navigator.mediaDevices) { addBubble('⚠️ Microphone not available in this browser.', 'bot-message'); return; }
-  voiceOn = true; el('voiceOverlay').classList.add('show'); setOrbState('listening'); updateBtn();
+  if (!navigator.mediaDevices?.getUserMedia) {
+    addBubble('⚠️ Microphone not available in this browser.', 'bot');
+    return;
+  }
+  VOICE_ON = true;
+  $('voiceOverlay').classList.add('active');
+  setOrb('listening');
+  updateBtn();
   await startRecording();
 }
 
 function stopVoice() {
-  voiceOn = false; el('voiceOverlay').classList.remove('show');
-  if (mRecorder && mRecorder.state === 'recording') mRecorder.stop();
-  cleanAudio();
-  if (curPlayer) { curPlayer.pause(); curPlayer = null; }
-  if (abortCtrl) abortCtrl.abort();
+  VOICE_ON = false;
+  $('voiceOverlay').classList.remove('active');
+  if (V_RECORDER?.state === 'recording') V_RECORDER.stop();
+  cleanupVoice();
+  if (CUR_PLAYER) { CUR_PLAYER.pause(); CUR_PLAYER = null; }
+  if (ABORT) ABORT.abort();
   updateBtn();
 }
 
-function setOrbState(s) {
-  const orb = el('voiceOrb'), txt = el('voiceTxt'); if (!orb || !txt) return;
+function setOrb(state) {
+  const orb = $('voiceOrb'), txt = $('voiceStatus'); if (!orb || !txt) return;
   orb.classList.remove('thinking', 'speaking');
-  if (s === 'thinking') { orb.classList.add('thinking'); txt.textContent = 'Thinking...'; }
-  else if (s === 'speaking') { orb.classList.add('speaking'); txt.textContent = 'Speaking...'; }
+  if (state === 'thinking') { orb.classList.add('thinking'); txt.textContent = 'Thinking...'; }
+  else if (state === 'speaking') { orb.classList.add('speaking'); txt.textContent = 'Speaking...'; }
   else { txt.textContent = 'Listening...'; }
 }
 
 async function startRecording() {
-  try { mStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch (e) { addBubble('⚠️ Microphone access denied.', 'bot-message'); stopVoice(); return; }
+  try { V_STREAM = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { addBubble('⚠️ Microphone access denied.', 'bot'); stopVoice(); return; }
 
-  mChunks = []; spokenAbove = false;
-  mRecorder = new MediaRecorder(mStream);
-  mRecorder.ondataavailable = e => { if (e.data.size > 0) mChunks.push(e.data); };
-  mRecorder.onstop = () => {
-    cleanAudio(); if (!voiceOn) return;
-    const blob = new Blob(mChunks, { type: mRecorder.mimeType });
-    if (blob.size > 1000) processAudio(blob); else startRecording();
+  V_CHUNKS = []; V_SPOKEN = false;
+  V_RECORDER = new MediaRecorder(V_STREAM);
+  V_RECORDER.ondataavailable = e => { if (e.data.size > 0) V_CHUNKS.push(e.data); };
+  V_RECORDER.onstop = () => {
+    cleanupVoice(); if (!VOICE_ON) return;
+    const blob = new Blob(V_CHUNKS, { type: V_RECORDER.mimeType });
+    blob.size > 1000 ? processVoice(blob) : startRecording();
   };
-  mRecorder.start(); setOrbState('listening'); watchSilence();
-  mTimer = setTimeout(() => { if (mRecorder?.state === 'recording') mRecorder.stop(); }, 15000);
+  V_RECORDER.start(); setOrb('listening'); watchSilence();
+  V_TIMER = setTimeout(() => { if (V_RECORDER?.state === 'recording') V_RECORDER.stop(); }, 15000);
 }
 
 function watchSilence() {
-  mCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const src = mCtx.createMediaStreamSource(mStream);
-  mAnalyser = mCtx.createAnalyser(); mAnalyser.fftSize = 512; src.connect(mAnalyser);
-  const buf = new Uint8Array(mAnalyser.frequencyBinCount); let silStart = null;
-
+  V_CTX = new (window.AudioContext || window.webkitAudioContext)();
+  const src = V_CTX.createMediaStreamSource(V_STREAM);
+  V_ANALYSER = V_CTX.createAnalyser(); V_ANALYSER.fftSize = 512; src.connect(V_ANALYSER);
+  const buf = new Uint8Array(V_ANALYSER.frequencyBinCount); let silStart = null;
   function chk() {
-    if (!mRecorder || mRecorder.state !== 'recording') return;
-    mAnalyser.getByteFrequencyData(buf);
+    if (!V_RECORDER || V_RECORDER.state !== 'recording') return;
+    V_ANALYSER.getByteFrequencyData(buf);
     const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
-    if (avg > 12) { spokenAbove = true; silStart = null; }
-    else if (spokenAbove) {
+    if (avg > 12) { V_SPOKEN = true; silStart = null; }
+    else if (V_SPOKEN) {
       if (!silStart) silStart = Date.now();
-      if (Date.now() - silStart > 1200) { mRecorder.stop(); return; }
+      if (Date.now() - silStart > 1200) { V_RECORDER.stop(); return; }
     }
     requestAnimationFrame(chk);
   }
   requestAnimationFrame(chk);
 }
 
-function cleanAudio() {
-  if (mTimer) { clearTimeout(mTimer); mTimer = null; }
-  if (mCtx) { mCtx.close(); mCtx = null; }
-  if (mStream) { mStream.getTracks().forEach(t => t.stop()); mStream = null; }
+function cleanupVoice() {
+  if (V_TIMER) { clearTimeout(V_TIMER); V_TIMER = null; }
+  if (V_CTX) { V_CTX.close(); V_CTX = null; }
+  if (V_STREAM) { V_STREAM.getTracks().forEach(t => t.stop()); V_STREAM = null; }
 }
 
-async function processAudio(blob) {
-  setOrbState('thinking');
-  const b64 = await new Promise(r => { const fr = new FileReader(); fr.onloadend = () => r(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
-
+async function processVoice(blob) {
+  setOrb('thinking');
+  const b64 = await blobToBase64(blob);
   try {
-    const res = await apiFetch('/.netlify/functions/transcribe', {
+    const resp = await apiFetch('/.netlify/functions/transcribe', {
       method: 'POST', body: JSON.stringify({ audioBase64: b64, mimeType: blob.type })
     });
-    if (!res.ok) throw new Error('Transcription failed');
-    const data = await res.json();
-    const txt = (data.text || '').trim();
-    if (!txt) { if (voiceOn) startRecording(); return; }
-    el('userInput').value = txt;
+    if (!resp.ok) throw new Error('Transcription failed');
+    const d = await resp.json();
+    const txt = (d.text || '').trim();
+    if (!txt) { if (VOICE_ON) startRecording(); return; }
+    $('msgInput').value = txt;
     sendMsg();
   } catch (e) {
     console.error('Transcribe error:', e);
-    if (voiceOn) { addBubble("⚠️ Couldn't understand. Please try again.", 'bot-message'); startRecording(); }
+    if (VOICE_ON) {
+      addBubble("⚠️ Couldn't understand. Please try again.", 'bot');
+      startRecording();
+    }
   }
 }
 
-async function playTTS(text) {
+async function tts(text) {
   return new Promise(async resolve => {
     try {
       const r = await apiFetch('/.netlify/functions/speak', {
-        method: 'POST', body: JSON.stringify({ text: stripMd(text), voice: chatVoice() })
+        method: 'POST', body: JSON.stringify({ text: stripForTTS(text), voice: chatVoice() })
       });
       if (!r.ok) { resolve(); return; }
       const d = await r.json();
-      const a = new Audio('data:audio/mp3;base64,' + d.audioBase64); curPlayer = a;
-      a.onended = () => { curPlayer = null; resolve(); };
-      a.onerror = () => { curPlayer = null; resolve(); };
-      a.play().catch(() => { curPlayer = null; resolve(); });
+      const a = new Audio('data:audio/mp3;base64,' + d.audioBase64);
+      CUR_PLAYER = a;
+      a.onended = () => { CUR_PLAYER = null; resolve(); };
+      a.onerror = () => { CUR_PLAYER = null; resolve(); };
+      a.play().catch(() => { CUR_PLAYER = null; resolve(); });
     } catch (e) { resolve(); }
   });
 }
 
-function speakableText(t) {
-  const m = t.match(/^\{\{FEXER_IMAGE:[\s\S]+?\}\}\n?([\s\S]*)$/);
-  return m ? (m[1] || "Here's your image!") : t;
-}
+// ══════════════════════════════════════
+//  PROJECTS
+// ══════════════════════════════════════
+let PROJECTS = [];
+let CUR_PROJECT_ID = null;
+let CUR_PLAN = null;
 
-function stripMd(t) {
-  return t.replace(/```[\s\S]*?```/g, '').replace(/[*_`#>~-]/g, '').replace(/\n+/g, '. ').trim();
-}
-
-// ════════════════════════════════════════════
-//  PROJECTS (AGENTS)
-// ════════════════════════════════════════════
-let agents = [], currentAgentId = null, agentPlan = null;
-
-function saveAgents() { try { localStorage.setItem('fexerAgents', JSON.stringify(agents)); } catch (e) { } }
-function loadAgents() {
-  try { const s = localStorage.getItem('fexerAgents'); if (s) agents = JSON.parse(s); } catch (e) { }
+function saveProjects() { Store.set('fexerProjects', PROJECTS); }
+function loadProjects() {
+  PROJECTS = Store.get('fexerProjects', []);
   renderProjectsSidebar();
 }
 
-// Open/close panel
-function openProjectPanel() {
-  el('agentPanel').classList.add('show');
-  renderProjectsPanelList();
+function openProjectsPanel() {
+  $('projectsPanel').classList.add('open');
+  renderPanelProjectList();
 }
-function closeProjectPanel() { el('agentPanel').classList.remove('show'); }
+function closeProjectsPanel() { $('projectsPanel').classList.remove('open'); }
 
-el('closeAgentPanel').addEventListener('click', closeProjectPanel);
+$('closePanelBtn').addEventListener('click', closeProjectsPanel);
 
-// Sidebar Projects section — click to open panel
-el('sidebarProjectsList').addEventListener('click', (e) => {
-  const item = e.target.closest('.sb-agent-item');
-  if (!item) return;
-  const id = item.dataset.id;
-  const agent = agents.find(a => a.id === id);
-  if (agent) { currentAgentId = id; openProjectPanel(); renderProjectsPanelList(); renderAgentDashboard(agent); }
-});
-
-// New project buttons
-el('newAgentBtn').addEventListener('click', () => {
-  openProjectPanel(); currentAgentId = null; showAgentState('welcome'); renderProjectsPanelList();
-});
-
-el('newAgentBtnPanel')?.addEventListener('click', () => {
-  currentAgentId = null; showAgentState('welcome'); renderProjectsPanelList();
+$('newProjectBtn').addEventListener('click', () => {
+  openProjectsPanel();
+  CUR_PROJECT_ID = null;
+  setProjectState('welcome');
+  renderPanelProjectList();
+  closeSidebar();
 });
 
 function renderProjectsSidebar() {
-  const list = el('sidebarProjectsList'); if (!list) return;
-  if (!agents.length) { list.innerHTML = '<div class="sb-agents-empty">No projects yet</div>'; return; }
+  const list = $('projectsList'); if (!list) return;
+  if (!PROJECTS.length) { list.innerHTML = '<div class="sb-empty">No projects yet</div>'; return; }
   list.innerHTML = '';
-  agents.forEach(a => {
+  PROJECTS.forEach(p => {
     const item = document.createElement('div');
-    item.className = 'sb-agent-item' + (a.id === currentAgentId ? ' active' : '');
-    item.dataset.id = a.id;
-    item.innerHTML = `<div class="sb-agent-icon">${I.bolt}</div><span class="sb-agent-name">${esc(a.name)}</span>`;
+    item.className = 'project-sb-item' + (p.id === CUR_PROJECT_ID ? ' active' : '');
+    item.innerHTML = `<div class="project-sb-icon">${IC.bolt}</div><span class="project-sb-name">${esc(p.name)}</span>`;
+    item.addEventListener('click', () => {
+      openProjectsPanel(); CUR_PROJECT_ID = p.id;
+      renderPanelProjectList(); showProjectDash(p); closeSidebar();
+    });
     list.appendChild(item);
   });
 }
 
-function renderProjectsPanelList() {
-  const list = el('agentsListPanel'); if (!list) return;
-  if (!agents.length) {
-    list.innerHTML = `<div class="agents-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><p>No projects yet</p></div>`;
+function renderPanelProjectList() {
+  const list = $('panelProjectsList'); if (!list) return;
+  if (!PROJECTS.length) {
+    list.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><p>No projects yet</p></div>`;
     return;
   }
   list.innerHTML = '';
-  agents.forEach(a => {
+  PROJECTS.forEach(p => {
     const item = document.createElement('div');
-    item.className = 'agent-panel-item' + (a.id === currentAgentId ? ' active' : '');
-    item.innerHTML = `<div class="ap-icon">${I.bolt}</div><div class="ap-info"><div class="ap-name">${esc(a.name)}</div><div class="ap-status ${a.active ? 'active' : ''}">${a.active ? '🟢 Active' : '⚪ Inactive'}</div></div><button class="ap-del">${I.trash}</button>`;
+    item.className = 'panel-project-item' + (p.id === CUR_PROJECT_ID ? ' active' : '');
+    item.innerHTML = `
+      <div class="pp-icon">${IC.bolt}</div>
+      <div class="pp-info">
+        <div class="pp-name">${esc(p.name)}</div>
+        <div class="pp-status ${p.active ? 'active' : ''}">${p.active ? '🟢 Active' : '⚪ Inactive'}</div>
+      </div>
+      <button class="pp-del">${IC.trash}</button>`;
 
-    item.querySelector('.ap-del').addEventListener('click', e => {
+    item.querySelector('.pp-del').addEventListener('click', e => {
       e.stopPropagation();
-      if (!confirm('Delete project "' + a.name + '"?')) return;
-      agents = agents.filter(x => x.id !== a.id); saveAgents();
-      if (currentAgentId === a.id) { currentAgentId = null; showAgentState('welcome'); }
-      renderProjectsPanelList(); renderProjectsSidebar();
+      if (!confirm('Delete "' + p.name + '"?')) return;
+      PROJECTS = PROJECTS.filter(x => x.id !== p.id); saveProjects();
+      if (CUR_PROJECT_ID === p.id) { CUR_PROJECT_ID = null; setProjectState('welcome'); }
+      renderPanelProjectList(); renderProjectsSidebar();
     });
 
     item.addEventListener('click', e => {
-      if (e.target.closest('.ap-del')) return;
-      currentAgentId = a.id; renderProjectsPanelList(); renderAgentDashboard(a);
+      if (e.target.closest('.pp-del')) return;
+      CUR_PROJECT_ID = p.id; renderPanelProjectList(); showProjectDash(p);
     });
 
     list.appendChild(item);
   });
 }
 
-function showAgentState(name) {
-  document.querySelectorAll('.agent-state').forEach(s => s.classList.remove('active'));
-  const t = el('state-' + name); if (t) t.classList.add('active');
+function setProjectState(name) {
+  document.querySelectorAll('.panel-state').forEach(s => s.classList.remove('active'));
+  const el = $('state-' + name); if (el) el.classList.add('active');
 }
 
-// ── Build Project (Agent Plan) ──
-el('agentSubmitBtn').addEventListener('click', buildProject);
-el('agentPromptInput').addEventListener('keypress', e => {
+// ── Build Project ──
+$('startProjectBtn').addEventListener('click', buildProject);
+$('projectPrompt').addEventListener('keypress', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); buildProject(); }
 });
 
 async function buildProject() {
-  const inp = el('agentPromptInput');
-  const prompt = (inp?.value || '').trim();
-  if (!prompt) { alert('Please describe your automation.'); return; }
+  const inp = $('projectPrompt'); if (!inp) return;
+  const prompt = inp.value.trim();
+  if (!prompt) { showToast('Please describe your automation.', 'error'); return; }
 
   const ok = await useCredit();
-  if (!ok) { closeProjectPanel(); openProfileModal('subscription'); return; }
+  if (!ok) { closeProjectsPanel(); openProfile('plans'); return; }
 
-  const btn = el('agentSubmitBtn'); if (btn) btn.disabled = true;
-  showAgentState('planning');
+  const btn = $('startProjectBtn'); if (btn) btn.disabled = true;
+  setProjectState('planning');
 
-  const stepEls = document.querySelectorAll('#planningSteps .plan-step');
+  const stepEls = document.querySelectorAll('#planSteps .plan-step');
   let si = 0;
   const timer = setInterval(() => {
     if (si > 0 && stepEls[si - 1]) { stepEls[si - 1].classList.remove('active'); stepEls[si - 1].classList.add('done'); }
@@ -1192,63 +1239,70 @@ async function buildProject() {
   }, 700);
 
   try {
-    const r = await apiFetch('/.netlify/functions/agent-plan', { method: 'POST', body: JSON.stringify({ prompt }) });
+    const r = await apiFetch('/.netlify/functions/agent-plan', {
+      method: 'POST', body: JSON.stringify({ prompt })
+    });
     const data = await r.json();
-    clearInterval(timer); stepEls.forEach(s => { s.classList.remove('active'); s.classList.add('done'); });
+    clearInterval(timer);
+    stepEls.forEach(s => { s.classList.remove('active'); s.classList.add('done'); });
 
     if (r.status === 402) {
-      if (btn) btn.disabled = false; showAgentState('welcome'); closeProjectPanel(); openProfileModal('subscription'); return;
+      if (btn) btn.disabled = false;
+      setProjectState('welcome'); closeProjectsPanel(); openProfile('plans'); return;
     }
     if (!r.ok || !data.plan) throw new Error(data.error || 'Planning failed');
 
-    agentPlan = { prompt, ...data.plan };
+    CUR_PLAN = { prompt, ...data.plan };
     if (btn) btn.disabled = false;
-    renderPlanAndCreds(data.plan);
+    renderPlanUI(data.plan);
 
   } catch (e) {
     clearInterval(timer); if (btn) btn.disabled = false;
-    showAgentState('welcome'); alert('❌ Planning failed: ' + e.message);
+    setProjectState('welcome');
+    showToast('❌ Planning failed: ' + e.message, 'error');
   }
 }
 
-function renderPlanAndCreds(plan) {
-  const nameEl = el('planName'), descEl = el('planDesc');
-  const stepsEl = el('planStepsList'), nodesEl = el('planNodeTags');
-  if (nameEl) nameEl.textContent = plan.agentName || 'Your Project';
-  if (descEl) descEl.textContent = plan.description || '';
-  if (stepsEl) stepsEl.innerHTML = (plan.steps || []).map(s => `<li>${esc(s)}</li>`).join('');
-  if (nodesEl) nodesEl.innerHTML = (plan.n8nNodes || []).map(n => `<span class="plan-tag">${esc(n)}</span>`).join('');
+function renderPlanUI(plan) {
+  const ne = $('planName'), de = $('planDesc'), se = $('planStepsList'), no = $('planNodeTags');
+  if (ne) ne.textContent = plan.agentName || 'Your Project';
+  if (de) de.textContent = plan.description || '';
+  if (se) se.innerHTML = (plan.steps || []).map(s => `<li>${esc(s)}</li>`).join('');
+  if (no) no.innerHTML = (plan.n8nNodes || []).map(n => `<span class="plan-tag">${esc(n)}</span>`).join('');
 
-  const credSection = el('credSection'), credList = el('credList');
+  const cs = $('credSection'), cl = $('credList');
   const needs = (plan.services || []).filter(s => s.credentialType !== 'none');
+  if (cs) cs.style.display = needs.length ? '' : 'none';
 
-  if (credSection && credList) {
-    credSection.style.display = needs.length ? '' : 'none';
-    if (needs.length) {
-      credList.innerHTML = '';
-      needs.forEach(svc => {
-        const item = document.createElement('div'); item.className = 'cred-item';
-        item.innerHTML = `
-          <div class="cred-item-head">
-            <div class="cred-icon">🔌</div>
-            <div><div class="cred-name">${esc(svc.name)}</div><div class="cred-reason">${esc(svc.reason || '')}</div></div>
+  if (cl && needs.length) {
+    cl.innerHTML = '';
+    needs.forEach(svc => {
+      const item = document.createElement('div'); item.className = 'cred-item';
+      item.innerHTML = `
+        <div class="cred-item-head">
+          <div class="cred-icon">🔌</div>
+          <div>
+            <div class="cred-name">${esc(svc.name)}</div>
+            <div class="cred-reason">${esc(svc.reason || '')}</div>
           </div>
-          <div class="cred-row">
-            <input type="password" class="cred-input" placeholder="${esc(svc.credentialLabel || svc.name + ' Key')}" data-key="${esc(svc.credentialKey)}">
-            ${svc.getUrl ? `<a href="${esc(svc.getUrl)}" target="_blank" class="cred-get-a">Get Key →</a>` : ''}
-          </div>`;
-        credList.appendChild(item);
-      });
-    }
+        </div>
+        <div class="cred-row">
+          <input type="password" class="cred-input"
+            placeholder="${esc(svc.credentialLabel || svc.name + ' Key')}"
+            data-key="${esc(svc.credentialKey)}">
+          ${svc.getUrl ? `<a href="${esc(svc.getUrl)}" target="_blank" class="cred-get-link">Get Key →</a>` : ''}
+        </div>`;
+      cl.appendChild(item);
+    });
   }
-  showAgentState('credentials');
+  setProjectState('credentials');
 }
 
-el('backBtn').addEventListener('click', () => showAgentState('welcome'));
+$('backToWelcomeBtn').addEventListener('click', () => setProjectState('welcome'));
 
 // ── Deploy ──
-el('deployBtn').addEventListener('click', async () => {
-  if (!agentPlan) return;
+$('deployBtn').addEventListener('click', async () => {
+  if (!CUR_PLAN) return;
 
   const credentials = {};
   document.querySelectorAll('#credList .cred-input').forEach(inp => {
@@ -1256,111 +1310,123 @@ el('deployBtn').addEventListener('click', async () => {
   });
 
   const ok = await useCredit();
-  if (!ok) { closeProjectPanel(); openProfileModal('subscription'); return; }
+  if (!ok) { closeProjectsPanel(); openProfile('plans'); return; }
 
-  const btn = el('deployBtn'); if (btn) btn.disabled = true;
-  showAgentState('deploying');
+  const btn = $('deployBtn'); if (btn) btn.disabled = true;
+  setProjectState('deploying');
 
   const dsIds = ['ds1', 'ds2', 'ds3', 'ds4']; let di = 0;
   const dt = setInterval(() => {
-    if (di > 0) { const p = el(dsIds[di - 1]); if (p) p.querySelector('.ds-icon').textContent = '✅'; }
-    if (di < dsIds.length) { const c = el(dsIds[di]); if (c) { c.querySelector('.ds-icon').textContent = '⏳'; c.querySelector('.ds-icon').classList.remove('pending'); } di++; }
+    if (di > 0) { const p = $(dsIds[di - 1]); if (p) p.querySelector('.ds-icon').textContent = '✅'; }
+    if (di < dsIds.length) { const c = $(dsIds[di]); if (c) c.querySelector('.ds-icon').textContent = '⏳'; di++; }
     else clearInterval(dt);
   }, 1200);
 
   try {
     const r = await apiFetch('/.netlify/functions/agent-deploy', {
-      method: 'POST', body: JSON.stringify({ prompt: agentPlan.prompt, plan: agentPlan, credentials })
+      method: 'POST',
+      body: JSON.stringify({ prompt: CUR_PLAN.prompt, plan: CUR_PLAN, credentials })
     });
     const data = await r.json();
     clearInterval(dt); if (btn) btn.disabled = false;
 
-    if (r.status === 402) { showAgentState('credentials'); closeProjectPanel(); openProfileModal('subscription'); return; }
+    if (r.status === 402) { setProjectState('credentials'); closeProjectsPanel(); openProfile('plans'); return; }
     if (!r.ok || !data.success) throw new Error(data.error || 'Deployment failed');
 
-    const agent = {
-      id: 'agent_' + Date.now(),
-      name: agentPlan.agentName,
-      description: agentPlan.description,
+    const project = {
+      id: genId('proj'),
+      name: CUR_PLAN.agentName,
+      description: CUR_PLAN.description,
       workflowId: data.workflowId,
       workflowUrl: data.workflowUrl,
       active: true,
       createdAt: new Date().toISOString(),
-      prompt: agentPlan.prompt
+      prompt: CUR_PLAN.prompt
     };
-    agents.unshift(agent); saveAgents(); currentAgentId = agent.id;
-    renderProjectsPanelList(); renderProjectsSidebar(); renderAgentDashboard(agent);
+
+    PROJECTS.unshift(project); saveProjects();
+    CUR_PROJECT_ID = project.id;
+    renderPanelProjectList(); renderProjectsSidebar(); showProjectDash(project);
+    showToast('🎉 Project deployed successfully!', 'success');
 
   } catch (e) {
     clearInterval(dt); if (btn) btn.disabled = false;
-    showAgentState('credentials');
-    alert('❌ Deployment failed: ' + e.message + '\n\nMake sure N8N_URL and N8N_API_KEY are set in Netlify environment variables.');
+    setProjectState('credentials');
+    showToast('❌ ' + e.message, 'error');
   }
 });
 
 // ── Dashboard ──
-function renderAgentDashboard(agent) {
-  const n = el('dashName'), d = el('dashDesc'), s = el('dashStatus'), lnk = el('dashN8nLink');
-  if (n) n.textContent = agent.name;
-  if (d) d.textContent = agent.description || agent.prompt || '';
-  if (s) { s.textContent = agent.active ? '🟢 Active' : '⚪ Inactive'; s.className = 'status-badge ' + (agent.active ? 'active-badge' : 'inactive-badge'); }
-  if (lnk) lnk.href = agent.workflowUrl || '#';
-  showAgentState('running');
-  loadExecutions(agent);
+function showProjectDash(project) {
+  const n = $('dashName'), d = $('dashDesc'), s = $('dashStatus'), lnk = $('n8nLink');
+  if (n) n.textContent = project.name;
+  if (d) d.textContent = project.description || project.prompt || '';
+  if (s) { s.textContent = project.active ? '🟢 Active' : '⚪ Inactive'; s.className = 'status-badge ' + (project.active ? 'active-badge' : 'inactive-badge'); }
+  if (lnk) lnk.href = project.workflowUrl || '#';
+  setProjectState('running');
+  loadExecutions(project);
 }
 
-el('dashRefresh').addEventListener('click', () => {
-  const a = agents.find(x => x.id === currentAgentId); if (a) loadExecutions(a);
+$('refreshExecBtn').addEventListener('click', () => {
+  const p = PROJECTS.find(x => x.id === CUR_PROJECT_ID);
+  if (p) loadExecutions(p);
 });
 
-el('dashDelete').addEventListener('click', () => {
-  const a = agents.find(x => x.id === currentAgentId);
-  if (!a || !confirm(`Delete project "${a.name}"?`)) return;
-  agents = agents.filter(x => x.id !== currentAgentId); saveAgents();
-  currentAgentId = null; renderProjectsPanelList(); renderProjectsSidebar(); showAgentState('welcome');
+$('deleteProjectBtn').addEventListener('click', () => {
+  const p = PROJECTS.find(x => x.id === CUR_PROJECT_ID);
+  if (!p || !confirm(`Delete project "${p.name}"?`)) return;
+  PROJECTS = PROJECTS.filter(x => x.id !== CUR_PROJECT_ID);
+  saveProjects(); CUR_PROJECT_ID = null;
+  renderPanelProjectList(); renderProjectsSidebar(); setProjectState('welcome');
 });
 
-async function loadExecutions(agent) {
-  if (!agent.workflowId) return;
-  const execList = el('execList'); if (execList) execList.innerHTML = '<p class="hint">Loading...</p>';
+async function loadExecutions(project) {
+  if (!project.workflowId) return;
+  const el = $('execList'); if (el) el.innerHTML = '<p class="hint-text">Loading...</p>';
 
   try {
     const r = await apiFetch('/.netlify/functions/agent-status', {
-      method: 'POST', body: JSON.stringify({ workflowId: agent.workflowId })
+      method: 'POST', body: JSON.stringify({ workflowId: project.workflowId })
     });
-    if (!r.ok) { if (execList) execList.innerHTML = '<p class="hint">Could not load executions.</p>'; return; }
+    if (!r.ok) { if (el) el.innerHTML = '<p class="hint-text">Could not load executions.</p>'; return; }
+
     const data = await r.json();
     const execs = data.executions || [];
 
-    const t = el('stTotal'), ok = el('stOk'), fl = el('stFail'), ls = el('stLast');
+    const t = $('stTotal'), ok = $('stOk'), fl = $('stFail'), ls = $('stLast');
     if (t) t.textContent = execs.length;
     if (ok) ok.textContent = execs.filter(e => e.status === 'success').length;
     if (fl) fl.textContent = execs.filter(e => e.status === 'error').length;
     if (ls) ls.textContent = execs.length ? timeAgo(execs[0].startedAt) : '—';
 
-    if (!execList) return;
-    if (!execs.length) { execList.innerHTML = '<p class="hint">No executions yet.</p>'; return; }
+    if (!el) return;
+    if (!execs.length) { el.innerHTML = '<p class="hint-text">No executions yet.</p>'; return; }
 
-    execList.innerHTML = execs.map(e => {
+    el.innerHTML = execs.map(e => {
       const st = e.status === 'success' ? 'success' : e.status === 'running' ? 'running' : 'error';
       const lbl = e.status === 'success' ? '✓ Success' : e.status === 'running' ? '↻ Running' : '✗ Failed';
       return `<div class="exec-row"><div class="exec-st"><div class="exec-dot ${st}"></div><span class="exec-label">${lbl}</span></div><span class="exec-time">${timeAgo(e.startedAt)}</span></div>`;
     }).join('');
+
   } catch (e) {
     console.error('Executions error:', e);
-    if (execList) execList.innerHTML = '<p class="hint">Error loading executions.</p>';
+    if (el) el.innerHTML = '<p class="hint-text">Error loading executions.</p>';
   }
 }
 
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 //  INIT
-// ════════════════════════════════════════════
+// ══════════════════════════════════════
 (async function init() {
-  await initAuth();
-  loadSettings();
-  loadChats();
-  loadAgents();
-  updateBtn();
-  updateHeader();
-  console.log('✅ Fexer AI ready');
+  try {
+    await initAuth();
+    loadSettings();
+    loadChats();
+    loadProjects();
+    updateBtn();
+    setHeader();
+    console.log('✅ Fexer AI ready');
+  } catch (e) {
+    console.error('Init error:', e);
+  }
 })();

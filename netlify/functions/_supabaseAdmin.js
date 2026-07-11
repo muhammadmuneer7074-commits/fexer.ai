@@ -5,11 +5,10 @@ const sb = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-async function verifyUser(authHeader) {
-    if (!authHeader) return null;
-    const token = authHeader.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : authHeader;
+async function verifyUser(headers) {
+    const auth = headers['authorization'] || headers['Authorization'] || '';
+    if (!auth) return null;
+    const token = auth.replace(/^Bearer\s+/i, '').trim();
     if (!token) return null;
     try {
         const { data: { user }, error } = await sb.auth.getUser(token);
@@ -20,54 +19,33 @@ async function verifyUser(authHeader) {
 
 async function checkAndUseCredit(userId, amount, action) {
     try {
-        const { data: cred, error } = await sb
-            .from('user_credits')
-            .select('*')
-            .eq('user_id', userId)
-            .single();
-
-        if (error || !cred) return { ok: true };
+        const { data: cred } = await sb.from('user_credits').select('*').eq('user_id', userId).single();
+        if (!cred) return { ok: true };
         if (cred.plan === 'max') {
-            await sb.from('activity_logs')
-                .insert({ user_id: userId, action, credits_used: 0 })
-                .catch(() => { });
+            sb.from('activity_logs').insert({ user_id: userId, action, credits_used: 0 }).catch(() => { });
             return { ok: true, unlimited: true };
         }
-
-        const now = new Date();
-        const hoursSince = (now - new Date(cred.last_reset)) / 3600000;
+        const hoursSince = (Date.now() - new Date(cred.last_reset)) / 3600000;
         let current = cred.credits_remaining;
-
         if (hoursSince >= 24) {
             current = cred.plan === 'pro' ? 100 : 5;
-            await sb.from('user_credits')
-                .update({ credits_remaining: current, last_reset: now.toISOString() })
-                .eq('user_id', userId);
+            await sb.from('user_credits').update({ credits_remaining: current, last_reset: new Date().toISOString() }).eq('user_id', userId);
         }
-
         if (current < amount) return { ok: false, remaining: current };
-
-        const newC = current - amount;
-        await sb.from('user_credits')
-            .update({ credits_remaining: newC })
-            .eq('user_id', userId);
-        await sb.from('activity_logs')
-            .insert({ user_id: userId, action, credits_used: amount })
-            .catch(() => { });
-        return { ok: true, remaining: newC };
-    } catch (e) {
-        return { ok: true };
-    }
+        await sb.from('user_credits').update({ credits_remaining: current - amount }).eq('user_id', userId);
+        sb.from('activity_logs').insert({ user_id: userId, action, credits_used: amount }).catch(() => { });
+        return { ok: true, remaining: current - amount };
+    } catch (e) { return { ok: true }; }
 }
 
-function resp(statusCode, body) {
+function resp(code, body) {
     return {
-        statusCode,
+        statusCode: code,
         headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
         },
         body: JSON.stringify(body)
     };
